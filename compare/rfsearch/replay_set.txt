@@ -1,0 +1,10 @@
+compare/results/mission-20261124-214358-i1/believer-5kg-avl-at
+compare/results/mission-20261124-214401-i2/believer-5kg-avl-at
+compare/results/mission-20261124-214407-i4/believer-5kg-avl-at
+compare/results/mission-20261124-214410-i5/believer-5kg-avl-at
+compare/results/mission-20261124-215715-i1/believer-5kg-avl-at
+compare/results/mission-20261124-215718-i2/believer-5kg-avl-at
+compare/results/mission-20261124-215724-i4/believer-5kg-avl-at
+compare/results/mission-20261124-215727-i5/believer-5kg-avl-at
+compare/results/mission-20261125-113830/believer-5kg-avl-at
+compare/results/mission-20261125-115520/believer-5kg-avl-at

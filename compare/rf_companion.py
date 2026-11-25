@@ -66,6 +66,16 @@ PEAK_SIGMA_SCALE, PEAK_SIGMA_FLOOR_DEG = 3.0, 1.25
 # 2-D Gaussian), 53 % inside 1 sigma (39 % expected), 100 % inside 3 sigma
 ELLIPSE_SCALE = 0.6
 MERGE_M = 1500.0                         # refined fixes closer than this are one source
+# estimator v2 (2026-11-25): each update used to start from scratch, so a source with two near-equal
+# solutions (two sources overlapping from most of the route) flipped between them, and re-assigning
+# every bearing could drop most of a source's bearings and blow its ellipse up. v2: the previous
+# estimate is a prior in the position refinement, a bearing keeps its source while within STICKY_GATE
+# sigma, bearings that fit two sources are left out of the ellipses, and an ellipse is widened when
+# the refined position disagrees with its own bearings' crossing
+ESTIMATOR_V2 = True
+STICKY_GATE = 5.0                        # sigma; a new assignment needs the usual 3
+PRIOR_MATCH_M, PRIOR_SCALE, PRIOR_MIN_M = 2000.0, 2.0, 150.0   # prior sigma = max(scale x previous, min)
+MOVED_WARN_MIN_BRG = 4                   # "moved outside its ellipse" only with at least this many bearings
 EIRP_DBM, FREQ_HZ = 47.0, 1.8e9          # 50 W noise source; only sets the power level
 PL_EXP, D0_M = 3.0, 100.0                # log-distance path loss beyond D0 (free space below)
 G0_DBI, BEAM_DEG, BACK_DB = 15.0, 30.0, 20.0    # helix; was a 45 deg, 8 dBi patch until 2026-11-24
@@ -385,7 +395,7 @@ def _fit_eirp(p, terms, eirp=None, only=None):
     return _sse(p, terms, eirp), eirp
 
 
-def select_sources(samples, cands, max_k=4, weak_db=8.0):
+def select_sources(samples, cands, max_k=4, weak_db=8.0, priors=()):
     """Which candidates are sources, and where exactly. Every subset of up to max_k candidates is
     fitted to all recorded readings (each source's power solved for) and the lowest BIC wins, so a
     ghost crossing that predicts readings nobody saw costs more than it explains. The chosen sources'
@@ -411,6 +421,15 @@ def select_sources(samples, cands, max_k=4, weak_db=8.0):
     eirp = best[2]
     t = np.array([terms[i] for i in best[1]])
     sigma = [None] * len(pos)
+    # v2: the previous estimate of the same source (within PRIOR_MATCH_M) is a Gaussian prior on its position,
+    # in units of the residual variance, so the refinement does not flip to a second near-equal minimum
+    prior = [None] * len(pos)
+    res_var0 = _fit_eirp(p, t)[0] / n
+    for k in range(len(pos)):
+        near = [q for q in priors if math.hypot(*ned(q["pos"], pos[k])) < PRIOR_MATCH_M]
+        if near:
+            q = min(near, key=lambda q: math.hypot(*ned(q["pos"], pos[k])))
+            prior[k] = (q["pos"], max(PRIOR_SCALE * q["sigma_m"], PRIOR_MIN_M))
     for _ in range(3):                            # refine each position, the others fixed
         for k in range(len(pos)):
             for span, step in ((800.0, 100.0), (150.0, 15.0)):
@@ -421,9 +440,11 @@ def select_sources(samples, cands, max_k=4, weak_db=8.0):
                         t2 = t.copy()
                         t2[k] = _model_terms(arr, q)
                         v, e2 = _fit_eirp(p, t2, eirp, only=k)
+                        if prior[k] is not None:
+                            v += res_var0 * (math.hypot(*ned(prior[k][0], q)) / prior[k][1]) ** 2
                         cells.append((v, dn, de, q, e2))
                 v0, dn0, de0, q0, e0 = min(cells, key=lambda c: c[0])
-                res_var = v0 / n
+                res_var = v0 / n if prior[k] is None else res_var0
                 sigma[k] = max([math.hypot(c[1] - dn0, c[2] - de0) for c in cells if c[0] <= v0 + res_var] + [step])
                 pos[k], eirp = q0, e0
                 t[k] = _model_terms(arr, q0)
@@ -466,7 +487,7 @@ def bearing_ellipse(pos, bearings, scale=ELLIPSE_SCALE):
             float(math.degrees(math.atan2(major[1], major[0])) % 180))
 
 
-def assign_bearings(bearings, fixes, gate=3.0):
+def assign_bearings(bearings, fixes, gate=3.0, prev=None):
     """Which source each bearing points at: pairs within `gate` (in units of max(sigma, 2 deg)) of the
     direction from the bearing's origin to a fix, closest first, at most one bearing per observation
     point per source. fixes: {id: fix}. Returns {bearing id: source id} (unassigned bearings left out)."""
@@ -475,14 +496,61 @@ def assign_bearings(bearings, fixes, gate=3.0):
         for sid, f in fixes.items():
             n, e = ned(b["pos"], f["pos"])
             err = abs(((math.degrees(math.atan2(e, n)) - b["bearing"] + 180) % 360) - 180) / max(b["sigma"], 2.0)
-            if err < gate:
-                pairs.append((err, b["id"], b["obs"], sid))
+            # v2: a bearing keeps the source it had while within STICKY_GATE, ahead of any new pairing
+            kept = prev is not None and prev.get(b["id"]) == sid and err < STICKY_GATE
+            if err < gate or kept:
+                pairs.append((err - 100.0 if kept else err, b["id"], b["obs"], sid))
     out, used = {}, set()
     for _, bid, o, sid in sorted(pairs):
         if bid not in out and (o, sid) not in used:
             out[bid] = sid
             used.add((o, sid))
     return out
+
+
+def ambiguous_bearings(bearings, fixes, gate=3.0):
+    """Ids of the bearings within `gate` of two or more fixes: their peak may be either source (or both,
+    merged), so they say nothing about either position."""
+    out = set()
+    for b in bearings:
+        hits = 0
+        for f in fixes.values():
+            n, e = ned(b["pos"], f["pos"])
+            hits += abs(((math.degrees(math.atan2(e, n)) - b["bearing"] + 180) % 360) - 180) / max(b["sigma"], 2.0) < gate
+        if hits > 1:
+            out.add(b["id"])
+    return out
+
+
+def bearing_crossing(pos, bearings):
+    """Weighted least-squares crossing of these bearings, started at pos; None if they do not cross."""
+    x = np.zeros(2)
+    for _ in range(10):
+        rows, res, w = [], [], []
+        for b in bearings:
+            n, e = ned(b["pos"], latlon(pos, x[0], x[1]))
+            r2 = n * n + e * e
+            rows.append([-e / r2, n / r2])
+            res.append(math.radians(((math.degrees(math.atan2(e, n)) - b["bearing"] + 180) % 360) - 180))
+            w.append(1 / math.radians(b["sigma"]) ** 2)
+        a, rv, wv = np.array(rows), np.array(res), np.array(w)
+        hess = (a * wv[:, None]).T @ a
+        if len(rows) < 2 or np.linalg.cond(hess) > 1e12:
+            return None
+        dx = np.linalg.solve(hess, -(a * wv[:, None]).T @ rv)
+        x = x + dx
+        if np.hypot(*dx) < 0.5:
+            break
+    return latlon(pos, x[0], x[1])
+
+
+def ellipse_distance(centre, ell, p):
+    """Distance of p from centre in units of the ellipse (semi-major, semi-minor, major-axis azimuth)."""
+    a, b, ori = ell
+    n, e = ned(centre, p)
+    th = math.radians(ori)
+    return math.hypot((n * math.cos(th) + e * math.sin(th)) / max(a, 1.0),
+                      (-n * math.sin(th) + e * math.cos(th)) / max(b, 1.0))
 
 
 class Gcs:
@@ -542,17 +610,36 @@ class Gcs:
                 self.next_id += 1
         self.removed |= set(free)
         self.removed -= set(new)
+        old = self.fixes
         self.fixes = new
-        assigned = assign_bearings(self.bearings, new)
+        prev = {b["id"]: b["source"] for b in self.bearings} if ESTIMATOR_V2 else None
+        assigned = assign_bearings(self.bearings, new, prev=prev)
+        amb = ambiguous_bearings(self.bearings, new) if ESTIMATOR_V2 else set()
         by_id = {b["id"]: b for b in self.bearings}
         for sid, f in new.items():
             # the label counts the bearings drawn in this source's colour, not the localisation's own
             # count (n), which can include a bearing the refined position no longer supports
             f["id"], f["bearings"] = sid, sorted(bid for bid, s in assigned.items() if s == sid)
-            ell = bearing_ellipse(f["pos"], [by_id[i] for i in f["bearings"]], self.ellipse_scale)
+            mine = [by_id[i] for i in f["bearings"]]
+            clear = [b for b in mine if b["id"] not in amb]
+            use = clear if len(clear) >= 2 else mine
+            ell = bearing_ellipse(f["pos"], use, self.ellipse_scale)
+            if ell is not None and ESTIMATOR_V2:
+                # the published position comes from the fit to all readings; where it disagrees with its own
+                # bearings' crossing by more than 2 sigma, the ellipse is widened to cover that crossing
+                cross = bearing_crossing(f["pos"], use)
+                m = ellipse_distance(f["pos"], ell, cross) if cross is not None else 0.0
+                if m > 2.0:
+                    ell = (ell[0] * m / 2.0, ell[1] * m / 2.0, ell[2])
             if ell is not None:
                 f["ellipse_m_deg"] = ell
                 f["sigma_m"] = ell[0]
+            o = old.get(sid)
+            # only once the source has MOVED_WARN_MIN_BRG bearings: before that the first fixes move by km anyway
+            if ESTIMATOR_V2 and o is not None and "ellipse_m_deg" in o and len(f["bearings"]) >= MOVED_WARN_MIN_BRG and \
+                    ellipse_distance(o["pos"], o["ellipse_m_deg"], f["pos"]) > 2.0:
+                self.text(f"RF: S{sid} moved {math.hypot(*ned(o['pos'], f['pos'])):.0f} m, outside its ellipse",
+                          mavutil.mavlink.MAV_SEVERITY_WARNING)
         for sid in list(new) + list(free):
             self._send_fix(sid)
         for b in self.bearings:
@@ -597,12 +684,12 @@ def solve_single(bearings):
                                                       cross_deg=math.degrees(gam), power_ratio_d1_d2=ratio)
 
 
-def solve_multi(bearings, samples, centre, half_size=9000.0):
+def solve_multi(bearings, samples, centre, half_size=9000.0, priors=()):
     """Several bearings from several points: candidates, model check against the raw readings
     (already thinned: loiter readings and straight-leg readings), fixes. Runs in a worker thread on
     copies."""
     cands = locate(bearings, centre, half_size, step=max(50.0, 2 * half_size / 360))
-    fixes, weak = select_sources(samples, cands)
+    fixes, weak = select_sources(samples, cands, priors=priors if ESTIMATOR_V2 else ())
     return fixes, dict(unconfirmed=weak, candidates=cands)
 
 
@@ -715,7 +802,8 @@ def main():
             centre = (sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts))
             half = min(max(9000.0, max(math.hypot(*ned(centre, p)) for p in pts) + 3000.0), 20000.0)
         final = len(done) == len(order) and (not sweeps or landing)
-        return len(done), worker.submit(solve_multi, snapshot_b, snapshot_s, centre, half), final
+        priors = [dict(pos=f["pos"], sigma_m=f["sigma_m"]) for f in gcs.fixes.values()]
+        return len(done), worker.submit(solve_multi, snapshot_b, snapshot_s, centre, half, priors), final
 
     def publish(fixes, details, final):
         ids = gcs.set_sources(fixes)
