@@ -236,7 +236,33 @@ RF_ELLIPSE_SW = [
     *LANDING,
 ]
 
+# A short two-source mission (2026-11-25): the same ellipse to the north, area RF2_D out on bearing RF2_BRG,
+# standoff RF2_STANDOFF: ~60 km of ellipse through RF2_POINTS waypoints ~5 km apart, ~70 km with the climb-out and
+# the return, ~1 h 05 min at 19 m/s. Climb-out on the runway heading leads onto the east side; flown clockwise.
+# Hidden sources for it: rf_companion.py scenario "two".
+RF2_BRG, RF2_D, RF2_STANDOFF, RF2_POINTS = 0.0, 18000.0, 4000.0, 12
+RF2_A, RF2_C = (RF2_D + RF2_STANDOFF) / 2, (RF2_D - RF2_STANDOFF) / 2
+RF2_B = math.sqrt(RF2_A ** 2 - RF2_C ** 2)
+
+
+def ellipse_two(k, n=RF2_POINTS):
+    """Waypoint k of the northern ellipse as (lat, lon): clockwise seen from above, k = 0 at home."""
+    t = math.pi - 2 * math.pi * k / n
+    return offset(RF2_A * (1 + math.cos(t)), -RF2_B * math.sin(t), hdg=RF2_BRG)
+
+
+RF_TWO = [
+    ("nav", TAKEOFF, offset(0), 120, dict(p1=12)),
+    ("nav", WAYPOINT, offset(2000), 400, {}),                       # climb-out on the runway heading
+    ("nav", WAYPOINT, ellipse_two(1), 700, {}),                     # onto the ellipse, still climbing
+    *[("nav", WAYPOINT, ellipse_two(k), RFM_ALT, {}) for k in range(2, RF2_POINTS - 1)],
+    ("nav", WAYPOINT, ellipse_two(RF2_POINTS - 1), 700, {}),
+    ("nav", WAYPOINT, offset(6000), 400, {}),                       # past home to the landing side, descending
+    *LANDING,
+]
+
 MISSIONS = {"tsuniv_search.plan": (SHORT, 9000.0), "tsuniv_search_long.plan": (LONG, 35000.0),
+            "tsuniv_rf_two.plan": (RF_TWO, 35000.0),
             "tsuniv_rf_search.plan": (RF, 15000.0), "tsuniv_rf_multi.plan": (RF_MULTI, 35000.0),
             "tsuniv_rf_ellipse.plan": (RF_ELLIPSE, 35000.0)}
 # tsuniv_rf_sweep.plan started as RF_SWEEP but has since been reworked in QGC (2026-11-24): QGC's file is

@@ -62,7 +62,9 @@ SCENARIOS = {"single": [(*SOURCE, 47.0)],
              # sw5 without its middle source (25.5 km out, 1 km left), which overlapped a neighbour from everywhere
              # on the route: 4 sources, at least 4.7 km apart
              "sw4": [(49.7146026, 23.4681194, 47.0), (49.6573702, 23.4976917, 47.0),
-                     (49.6382927, 23.4385470, 47.0), (49.6987047, 23.4040460, 47.0)]}
+                     (49.6382927, 23.4385470, 47.0), (49.6987047, 23.4040460, 47.0)],
+             # two sources 16 and 19.5 km north of home, 5.7 km apart, for tsuniv_rf_two.plan
+             "two": [(49.9697795, 23.7247633, 47.0), (50.0012557, 23.6620309, 47.0)]}
 # per-peak bearing sigma = hypot(PEAK_SIGMA_SCALE * fit sigma, PEAK_SIGMA_FLOOR_DEG): calibrated on 120
 # offline-study peaks against their true bearings (66 % within 1 sigma, 98 % within 2; median ~2 deg).
 # The raw fit sigma tracks the error (correlation 0.82) and widens for weak peaks, but assumes
