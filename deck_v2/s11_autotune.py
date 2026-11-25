@@ -11,7 +11,7 @@ import diag as d
 d.H = 46.7                      # one-line title at 28 pt
 tr = json.load(open("compare/results/roll_step_traces.json"))
 fig = c.figure(16, 16 * d.H / d.W)
-ax = c.axes(fig, [0.05, 0.12, 0.385, 0.76], "секунди від команди", "крен, °", size=13)
+ax = c.axes(fig, [0.05, 0.13, 0.36, 0.78], "секунди від команди", "крен, °", size=14)   # same box as s10_log
 m, a = tr["mfe"], tr["at"]
 ax.plot(a["ts"], a["des"], color=c.GREY, lw=2, ls=(0, (4, 2.5)))
 ax.plot(m["ts"], m["roll"], color=c.GREY, lw=2.4)
@@ -23,7 +23,7 @@ ax.text(0.95, -47.5, "MFE −45°", fontsize=14, color=c.GREY, fontweight="bold"
 ax.text(3.2, 6.0, "AUTOTUNE", fontsize=15, color=c.ACC, fontweight="bold")
 ax.text(3.2, 0.5, "команда (пунктир)", fontsize=13, color=c.GREY)
 ax.text(-0.9, -31.5, "ліміт 30°", ha="left", va="top", fontsize=13, color=d.C["power"])
-ax.text(-0.9, 20.5, "той самий політ, та сама команда крену −29°", fontsize=13, color=d.INK, fontweight="bold",
+ax.text(-0.9, 21.7, "той самий політ, та сама команда крену −29°", fontsize=13, color=d.INK, fontweight="bold",
         va="top")
 
 dax = fig.add_axes([0, 0, 1, 1])

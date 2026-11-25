@@ -3,7 +3,7 @@ transitions with the parameters that set them, plus the RC-link / mode timeline 
 (the 25.11 RC-loss flight of the two-source RFSEARCH mission, compare/rfsearch/batch_rcloss/two_s11_rcloss.log).
 
 Take-off from sim/params/believer.parm / believer_5kg.parm and compare/launch.md (3.3 g catapult, 100 % for
-5 s, rotation hold 5 deg to 15 m/s then <= 8 deg; 0 of 18 SITL ground contacts). Failsafe from
+5 s, rotation hold 5 deg to 15 m/s then <= 8 deg; 0 crashes in 18 SITL launches). Failsafe from
 sim/params/believer_mission.parm and believer_5kg.parm, ArduPlane/events.cpp (FS_*_ACTN 0 in AUTO takes no
 action), defaults FS_SHORT_TIMEOUT 1.5 s / FS_LONG_TIMEOUT 5 s, FS_GCS_ENABL 0; tested: RC loss 60 s and
 1 h 15 min (SITL, stays AUTO). Battery and fence failsafes are configured, not flight-tested.
@@ -45,7 +45,7 @@ box(70, 4, 29.5, 8.5, "Посадка", ["DO_LAND_START → NAV_LAND", "смуг
 # catapult take-off into AUTO (sim/params/believer*.parm, compare/launch.md)
 box(0.5, 28.2, 23.5, 12.8, "Зліт з катапульти 3,3 g", [
     "TKOFF_THR_DELAY 2: мотор за 0,2 с", "TKOFF_THR_MAX 100 · _T 5: 100% 5 с,", "пік 87–89 А, далі ≤ 75% (Lua)",
-    "ROTATE_SPD 15 · GND_PITCH 5,", "LVL_PITCH 8: тангаж ≤ 8°", "SITL: 0 з 18 торкань землі"],
+    "ROTATE_SPD 15 · GND_PITCH 5,", "LVL_PITCH 8: тангаж ≤ 8°", "SITL: 0 падінь у 18 стартах"],
     title_size=15.5, line_size=12.5, ec=d.C["usb"])
 arrow([(24, 34.6), (28, 34.6)], "usb")
 

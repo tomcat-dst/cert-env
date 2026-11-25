@@ -1,5 +1,5 @@
 """Slide 3: the two loadouts. Top view of the Starlink variant (root inserts, dish, battery), spec table,
-SITL endurance (gusty bars: THR_MAX 75, climb 2 m/s, runs endurance-20261124-002019/-002024) and the power split (slide notes: 169 / 196 W motors at 900 m, 18 / 54 W payload,
+SITL endurance (gusty bars: THR_MAX 75, climb 2 m/s, runs endurance-20261124-002019/-002024) and the power split (slide notes: 169 / 196 W motors at 900 m, 18 / 54 W consumption of the payload electronics,
 90 % of 444 / 555 Wh). The top view is schematic: span and fuselage length to scale, chords are not."""
 import numpy as np
 from matplotlib.patches import Polygon, Rectangle, FancyBboxPatch
@@ -75,7 +75,7 @@ rows = [["", "Базова", "Starlink"],
         ["мотори · гвинти", "2× X3120 585KV · APC 11×7E", "2× X3120 585KV · APC 11×7E"],
         ["канал", "LTE (EG25-G)", "Starlink Mini"],
         ["звалювання · крейсер", "11,6 · 19 м/с", "11,2 · 19 м/с"],
-        ["навантаження", "18 Вт", "54 Вт (через DC-DC)"]]
+        ["споживання", "18 Вт", "54 Вт (через DC-DC)"]]
 d.box(dax, 0.5, 0.5, 48.5, 19.6, None)
 d.table(dax, 1.4, 19.3, [0, 12.8, 30.0], rows, size=11.5, row_h=1.72)
 d.note(dax, 48.3, 1.0, "MTOW: дані MFE; лонжерон під 5,9 кг ще не перевірено", size=9.5, color=d.C["power"],
@@ -93,7 +93,7 @@ for bars in (b1, b2):
         m = int(r.get_height())
         ax.text(r.get_x() + r.get_width() / 2, m + 2, f"{m // 60}:{m % 60:02d}", ha="center", va="bottom",
                 fontsize=12.5, color=d.INK, fontweight="bold")
-ax.axhline(83, color=d.C["power"], lw=1.5, ls=(0, (4, 2.5)), label="місія 1:23, 52% батареї")
+ax.axhline(64, color=d.C["power"], lw=1.5, ls=(0, (4, 2.5)), label="місія 1:04, 38% батареї")
 ax.set_xticks(x, cats, fontsize=12, color=d.INK)
 ax.set_ylim(0, 145)
 ax.legend(frameon=False, fontsize=11.5, labelcolor=d.MUTED, loc="upper right", ncol=3, bbox_to_anchor=(1.0, 1.13))
@@ -101,7 +101,7 @@ ax.legend(frameon=False, fontsize=11.5, labelcolor=d.MUTED, loc="upper right", n
 # --- power split ---
 d.box(dax, 52.5, 0.5, 47, 15.4, None)
 d.note(dax, 53.5, 15.1, "Потужність у крейсері на 900 м", size=13.5, color=d.INK, va="top", bold=True)
-PX0, PS = 62.0, 0.12                       # bar origin, units per watt
+PX0, PS = 62.0, 0.088                      # bar origin, units per watt
 for k, (name, mot, pay, energy, t) in enumerate([("базова", 169, 18, 400, "2:02"),
                                                ("Starlink", 196, 54, 500, "1:54")]):
     yy = 10.6 - k * 4.6
@@ -109,7 +109,7 @@ for k, (name, mot, pay, energy, t) in enumerate([("базова", 169, 18, 400, 
     dax.add_patch(Rectangle((PX0, yy), mot * PS, 1.8, fc=c.ACC if k == 0 else c.ACC2, ec="none", zorder=3))
     dax.add_patch(Rectangle((PX0 + mot * PS, yy), pay * PS, 1.8, fc=DISH if k else d.C["uart"], ec="none", zorder=3))
     d.note(dax, PX0 + 0.4, yy + 0.9, f"мотори {mot} Вт", size=10.5, color="#0E1411", va="center", bold=True)
-    d.note(dax, PX0 + (mot + pay) * PS + 0.5, yy + 0.9, f"+{pay} = {mot + pay} Вт", size=10.5, va="center")
+    d.note(dax, PX0 + (mot + pay) * PS + 0.5, yy + 0.9, f"+{pay} Вт споживання = {mot + pay} Вт", size=10.5, va="center")
     d.note(dax, 53.5, yy - 0.9, f"{energy} Вт·год* · {t}", size=10.5, va="center")
 d.note(dax, 53.5, 3.0, "* 90% ємності батареї: останні 10% — резерв під battery failsafe (RTL)", size=10,
        va="bottom")

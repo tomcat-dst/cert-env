@@ -86,7 +86,7 @@ cax.set_ylim(0, 95)
 cax.annotate("катапульта 3,3 g, далі 100% газу 5 с:\n87–89 А ≈ 4 с", (0.15, 86), (2.3, 72), fontsize=10.5,
              color=d.INK, va="center", arrowprops=dict(arrowstyle="-", color=d.MUTED, lw=1))
 cax.text(9.4, 42, "далі газ ≤ 75%, набір 2 м/с до 900 м", ha="right", va="bottom", fontsize=10.5, color=d.MUTED)
-cax.text(9.4, 52.5, "тангаж зльоту ≤ 8°: 0 з 18 торкань землі\nу SITL (при 15°: 2 з 19)", ha="right", va="bottom",
+cax.text(9.4, 52.5, "тангаж зльоту ≤ 8°: 0 падінь у 18 стартах\nSITL (при 15°: 2 з 19)", ha="right", va="bottom",
          fontsize=10.5, color=d.C["power"])
 cax.legend(frameon=False, fontsize=10.5, labelcolor=d.MUTED, loc="upper right", bbox_to_anchor=(1.0, 1.0))
 d.note(ax, 1.4, 28.6, "ESC 2 × 60 = 120 А і датчик 132 А — вище шкали · середнє за 3 с", size=10.5, va="top")
