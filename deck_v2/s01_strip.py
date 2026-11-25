@@ -1,4 +1,4 @@
-"""Slide 1: key-figure strip under the title block (numbers from the deck and the long mission).
+"""Slide 1: key-figure strip under the title block (numbers from the deck and the 25.11 RC-loss flight of the two-source mission).
 Dark theme of slide 1: background #121C17, green accent."""
 import matplotlib
 matplotlib.use("Agg")
@@ -15,7 +15,7 @@ ax.set_xlim(0, W)
 ax.set_ylim(0, H)
 ax.axis("off")
 items = [("5,0 кг", "базова маса"), ("1,96 м", "розмах"), ("2 год 02 хв", "на 900 м, SITL"),
-         ("101 км", "місія без RC 1:15"), ("0,56 м/с", "автопосадка"), ("16° → 2°", "крен після AUTOTUNE")]
+         ("76 км", "місія, 54 хв без RC"), ("0,60 м/с", "автопосадка"), ("16° → 2°", "крен після AUTOTUNE")]
 w = W / len(items)
 for i, (big, small) in enumerate(items):
     x = i * w + 0.5

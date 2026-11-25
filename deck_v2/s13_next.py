@@ -1,8 +1,8 @@
 """Slide (conclusions): done -> improve -> next, plus the skills used (from the project's work).
 
 Numbers: RFSEARCH 78 of 78 sources / median 48 m from compare/rfsearch/circle_runs.json (30 flights); the two QGC
-flights of 2026-11-25 (47-67 m and 73-434 m, 2.4 km ellipse) from deck_v2/s15_scenarios.py; RC loss 1 h 15 min and
-touchdown 0.56 m/s from the 23.11 long mission; checklist 80.65 % (25 of 31)."""
+flights of 2026-11-25 (47-67 m and 73-434 m, 2.4 km ellipse) from deck_v2/s15_scenarios.py; RC loss 54 min and
+touchdown 0.60 m/s from the 25.11 RC-loss flight (compare/rfsearch/batch_rcloss/two_s11_rcloss.log); checklist 80.65 % (25 of 31)."""
 import diag as d
 
 d.H = 46.7                      # one-line title at 28 pt
@@ -11,7 +11,7 @@ cols = [
     ("Виконано", d.GOOD, ["модель Believer у SITL: мотор, гвинт,", "батарея, катапульта, AVL",
                              "3 виправлення SITL (патч до 4.7.3)", "AUTOTUNE: перерегулювання 16° → 2°",
                              "режим RFSEARCH: 78 з 78 джерел", "у 30 польотах, медіана 48 м",
-                             "автономність: 1 год 15 хв без RC,", "автопосадка 0,56 м/с",
+                             "54 хв без RC: пошук триває,", "автопосадка 0,60 м/с",
                              "логи, звіт, чекліст 80,65%"]),
     ("Покращити", d.C["power"], ["обміряти хвіст, елерони, центр мас", "→ уточнити модель AVL",
                                  "лонжерон: тест 1,5–2× навантаження", "GNSS L1 + L5 проти завад",

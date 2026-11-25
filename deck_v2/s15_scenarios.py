@@ -6,7 +6,7 @@ Sources: compare/results/mission-20261125-154716 (two sources: logs/mission-rfse
 compare/results/mission-20261125-151006 (four sources: logs/mission-rfsearch-sw4-qgc-1510.out): rf_result.json
 (truth, fixes with error_m and ellipse_m_deg, bearings) and rf_samples.csv (track). Flight time is ARMED to
 "landed and disarmed", distance is the flown track (circles included), both from those logs. The RC-loss line
-is the 23.11 long mission (compare/results/mission-20261123-165646, in the report).
+is the 25.11 RC-loss flight of the two-source plan (compare/rfsearch/batch_rcloss/two_s11_rcloss.log).
 """
 import csv
 import json
@@ -142,5 +142,5 @@ panel(50.25, "Реалістичний сценарій: 4 джерела", "м�
 d.box(ax, 0.5, 0.5, 99, 3.4, None, ec=d.LINE)
 d.note(ax, 1.5, 2.2, "Обидва польоти: QGC + SITL, RFSEARCH від катапульти до автопосадки, ті самі параметри RFS_, "
        "синтетичні джерела.", size=12, color=d.INK, va="center")
-d.note(ax, 98.5, 2.2, "Втрата RC — окремий політ 23.11: 1 год 15 хв в AUTO без RC", size=12, va="center", ha="right")
+d.note(ax, 98.5, 2.2, "Втрата RC: той самий план, 54 хв без RC, джерела за 78 і 57 м", size=12, va="center", ha="right")
 d.save(fig, "deck_v2/s15_scenarios.png")
