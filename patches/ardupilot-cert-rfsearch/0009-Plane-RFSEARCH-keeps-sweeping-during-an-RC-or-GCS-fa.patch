@@ -1,0 +1,58 @@
+From 635f4730303b167fd59eadee09702dbf0b55a608 Mon Sep 17 00:00:00 2001
+From: Vlad Syan <vlad.syan@gmail.com>
+Date: Wed, 25 Nov 2026 17:10:36 +0200
+Subject: [PATCH 9/9] Plane: RFSEARCH keeps sweeping during an RC or GCS
+ failsafe
+
+rf_search_leg_ok() refused sweeps whenever an RC failsafe was active. With
+FS_SHORT_ACTN 0 and FS_LONG_ACTN 0 the mission continues without RC, and
+the search area is beyond RC range, so the aircraft flew the whole mission
+and never searched (SITL: 0 sweeps with SIM_RC_FAIL 1 past 5 km). Only a
+battery failsafe stops sweeps now. SITL after the change: 14 sweeps with
+RC lost for 54 min, both sources found.
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+---
+ ArduPlane/mode_auto.cpp | 6 +++---
+ ArduPlane/rf_search.h   | 2 +-
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/ArduPlane/mode_auto.cpp b/ArduPlane/mode_auto.cpp
+index 32fc9e291e..5294be2ed2 100644
+--- a/ArduPlane/mode_auto.cpp
++++ b/ArduPlane/mode_auto.cpp
+@@ -155,15 +155,15 @@ void ModeAuto::set_rf_search(bool enable)
+     rf_search = enable;
+ }
+ 
+-// sweeps only on a plain waypoint leg in normal flight: not taking off, landing or in failsafe
++// sweeps only on a plain waypoint leg in normal flight: not taking off, landing or in battery failsafe.
++// An RC or GCS failsafe does not stop them: if its action left the aircraft in this mode (FS_SHORT_ACTN 0,
++// FS_LONG_ACTN 0), the mission goes on, and the search area is beyond RC range anyway.
+ bool ModeAuto::rf_search_leg_ok()
+ {
+     return plane.mission.get_current_nav_cmd().id == MAV_CMD_NAV_WAYPOINT &&
+            plane.flight_stage == AP_FixedWing::FlightStage::NORMAL &&
+            !plane.mission.get_in_landing_sequence_flag() &&
+            plane.is_flying() &&
+-           !plane.failsafe.rc_failsafe &&
+-           plane.failsafe.state == FAILSAFE_NONE &&
+            !AP::battery().has_failsafed();
+ }
+ 
+diff --git a/ArduPlane/rf_search.h b/ArduPlane/rf_search.h
+index c13881b77d..06b40603cf 100644
+--- a/ArduPlane/rf_search.h
++++ b/ArduPlane/rf_search.h
+@@ -38,7 +38,7 @@ public:
+     void abort(const char *why);
+ 
+     // called from ModeAuto::navigate() in RFSEARCH at the navigation rate. leg_ok: on a plain
+-    // waypoint leg, not taking off, landing or in failsafe. Returns true while a sweep owns the
++    // waypoint leg, not taking off, landing or in battery failsafe. Returns true while a sweep owns the
+     // steering (the mission is then not updated)
+     bool update(const Location &here, const Location &prev_wp, const Location &next_wp, bool leg_ok);
+ 
+-- 
+2.43.0
+

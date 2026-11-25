@@ -1,0 +1,30 @@
+From 86d86f2f155eae6b68bba99a980581809c619885 Mon Sep 17 00:00:00 2001
+From: Vlad Syan <vlad.syan@gmail.com>
+Date: Wed, 25 Nov 2026 11:50:46 +0200
+Subject: [PATCH 8/9] Plane: RFS_MIN_LEG default 500 m
+
+At 1500 m a sweep could not start within 1.5 km of the next waypoint (or 500 m
+of the previous one), which skipped useful sweeps near the turns; 500 m keeps
+the circle clear of the waypoint turn.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ ArduPlane/rf_search.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/ArduPlane/rf_search.cpp b/ArduPlane/rf_search.cpp
+index 8a3254c301..8589fc126a 100644
+--- a/ArduPlane/rf_search.cpp
++++ b/ArduPlane/rf_search.cpp
+@@ -40,7 +40,7 @@ const AP_Param::GroupInfo RFSearch::var_info[] = {
+     // @Units: m
+     // @Range: 300 10000
+     // @User: Standard
+-    AP_GROUPINFO("MIN_LEG", 4, RFSearch, _min_leg_m, 1500.0f),
++    AP_GROUPINFO("MIN_LEG", 4, RFSearch, _min_leg_m, 500.0f),
+ 
+     // @Param: STALE
+     // @DisplayName: RF reading timeout
+-- 
+2.43.0
+
