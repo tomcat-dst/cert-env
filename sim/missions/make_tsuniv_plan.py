@@ -237,28 +237,39 @@ RF_ELLIPSE_SW = [
 ]
 
 # A short two-source mission (2026-11-25): the same ellipse to the north, area RF2_D out on bearing RF2_BRG,
-# standoff RF2_STANDOFF: ~60 km of ellipse through RF2_POINTS waypoints ~5 km apart, ~70 km with the climb-out and
-# the return, ~1 h 05 min at 19 m/s. Climb-out on the runway heading leads onto the east side; flown clockwise.
+# standoff RF2_STANDOFF, RF2_POINTS waypoints ~5.5 km apart, ~70 km and ~1 h 05 min at 19 m/s.
+# Flown COUNTER-clockwise: the catapult launches on heading 109, so the climb-out leads onto the EAST side
+# (clockwise, as first generated, put waypoint 3 behind the launch: a 180 deg turn over home). The route then
+# comes back down the west side and lands straight in from the west, on the launch heading: LANDING_WEST.
 # Hidden sources for it: rf_companion.py scenario "two".
-RF2_BRG, RF2_D, RF2_STANDOFF, RF2_POINTS = 0.0, 18000.0, 4000.0, 12
+RF2_BRG, RF2_D, RF2_STANDOFF, RF2_POINTS = 0.0, 21500.0, 4000.0, 12
 RF2_A, RF2_C = (RF2_D + RF2_STANDOFF) / 2, (RF2_D - RF2_STANDOFF) / 2
 RF2_B = math.sqrt(RF2_A ** 2 - RF2_C ** 2)
 
 
-def ellipse_two(k, n=RF2_POINTS):
-    """Waypoint k of the northern ellipse as (lat, lon): clockwise seen from above, k = 0 at home."""
-    t = math.pi - 2 * math.pi * k / n
+def ellipse_two(j, n=RF2_POINTS):
+    """Waypoint j of the northern ellipse as (lat, lon): counter-clockwise seen from above, j = 0 at home."""
+    t = math.pi + 2 * math.pi * j / n
     return offset(RF2_A * (1 + math.cos(t)), -RF2_B * math.sin(t), hdg=RF2_BRG)
 
+
+# landing on the launch heading (109), from the west: entry 4.5 km out at 200 m, final from 1.6 km at 60 m
+# (2.3 deg), touchdown 100 m before the runway midpoint. The legs before it descend at no more than ~4.5 deg:
+# 7-9 deg legs (first QGC-edited south-west plan) left the aircraft 190 m high at the touchdown point
+LANDING_WEST = [
+    ("land_start", DO_LAND_START, offset(-4500), 0, {}),
+    ("nav", WAYPOINT, offset(-4500), 200, {}),
+    ("nav", WAYPOINT, offset(-1600), 60, {}),
+    ("nav", LAND, offset(-100), 0, dict(p4=0)),
+]
 
 RF_TWO = [
     ("nav", TAKEOFF, offset(0), 120, dict(p1=12)),
     ("nav", WAYPOINT, offset(2000), 400, {}),                       # climb-out on the runway heading
-    ("nav", WAYPOINT, ellipse_two(1), 700, {}),                     # onto the ellipse, still climbing
-    *[("nav", WAYPOINT, ellipse_two(k), RFM_ALT, {}) for k in range(2, RF2_POINTS - 1)],
-    ("nav", WAYPOINT, ellipse_two(RF2_POINTS - 1), 700, {}),
-    ("nav", WAYPOINT, offset(6000), 400, {}),                       # past home to the landing side, descending
-    *LANDING,
+    ("nav", WAYPOINT, ellipse_two(1), 700, {}),                     # onto the ellipse (east side), still climbing
+    *[("nav", WAYPOINT, ellipse_two(j), RFM_ALT, {}) for j in range(2, RF2_POINTS - 2)],
+    ("nav", WAYPOINT, ellipse_two(RF2_POINTS - 2), 600, {}),        # west side, descending towards the approach
+    *LANDING_WEST,
 ]
 
 MISSIONS = {"tsuniv_search.plan": (SHORT, 9000.0), "tsuniv_search_long.plan": (LONG, 35000.0),
