@@ -28,3 +28,6 @@ eeprom.bin
 /deck-preview.pdf
 /deliverables/report_check/
 /smoke/qgc-home/
+
+# per-circle flight screenshots (large PNGs); the timelapse video made from them is kept
+/deliverables/screenshots/rfsearch_4src_flight/
