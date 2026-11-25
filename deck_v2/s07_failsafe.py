@@ -1,4 +1,4 @@
-"""Slide (parked): custom ArduPilot parameters - catapult take-off, failsafe behaviour as states and
+"""Slide 6: custom ArduPilot parameters - catapult take-off, failsafe behaviour as states and
 transitions with the parameters that set them, plus the RC-link / mode timeline of the long QGC mission
 (deck_v2/mission_profiles.json, from compare/results/mission-20261123-165646).
 
@@ -33,8 +33,9 @@ def box(x, y, w, h, *a, **k):
 
 
 # states
-box(28, 28.5, 24, 9, "AUTO · місія", ["пункти 1…28, RC не потрібен", "≈ 99 км, пошук на 900 м", "AIRSPEED_MIN 14 (у MFE 12)"], title_size=19,
-    line_size=14,
+box(28, 28.5, 24, 12.5, "AUTO / RFSEARCH · місія", ["RC не потрібен до посадки", "AIRSPEED_MIN 14 (у MFE 12),",
+                                                   "AIRSPEED_STALL 12", "RFS_THR_DBM −90 · STOP_DB 5,",
+                                                   "SPACING 3000 · MIN_LEG 500"], title_size=16, line_size=13,
     ec=d.C["uart"], lw=2.4)
 box(28, 4, 24, 8.5, "RTL", ["RTL_ALTITUDE −1:", "додому на поточній висоті"], title_size=19, line_size=13.5)
 box(70, 4, 29.5, 8.5, "Посадка", ["DO_LAND_START → NAV_LAND", "смуга 28, автодизарм після дотику"],
@@ -93,7 +94,7 @@ def tx(t):
     return X0 + (X1 - X0) * t / T_END
 
 
-d.note(ax, 1.4, 7.6, "Місія з QGC, SITL", size=12.5, color=d.INK, va="center", bold=True)
+d.note(ax, 1.4, 7.6, "Політ 23.11, QGC", size=12.5, color=d.INK, va="center", bold=True)
 d.note(ax, 1.4, 5.0, "RC-зв'язок", size=11.5, va="center")
 d.note(ax, 1.4, 2.6, "режим", size=11.5, va="center")
 for a, b, col, lab in ((0, t_lost, d.GOOD, "є"), (t_lost, t_back, d.C["rc"], "немає 1 год 15 хв (> 5 км)"),

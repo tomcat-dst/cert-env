@@ -6,6 +6,7 @@ import json
 import chart as c
 import diag as d
 
+d.H = 46.7                      # one-line title at 28 pt
 tr = json.load(open("compare/results/roll_step_traces.json"))["mfe"]
 t = tr["ts"]          # already relative to the command
 
@@ -26,7 +27,7 @@ dax.set_xlim(0, d.W)
 dax.set_ylim(0, d.H)
 dax.axis("off")
 # roll-rate loop, ArduPlane roll controller
-Y = 33
+Y = 36
 d.box(dax, 44, Y - 4, 11, 8, "Ціль крену", ["−29° (вхід", "у GUIDED)"], title_size=15, line_size=13)
 d.box(dax, 58, Y - 4, 13, 8, "RLL2SRV_TCONST", ["0,45 с → ціль", "швидкості ≤ 75°/с"], title_size=14, line_size=13)
 d.box(dax, 74, Y - 4, 12, 8, "Σ → елерони", ["−74%", "(насичення)"], title_size=15, line_size=13,
@@ -38,15 +39,15 @@ for x0, x1 in ((55, 58), (71, 74), (86, 89)):
 terms = [(58, "FF 0,57", "→ −74% елеронів", d.C["power"]), (70, "P 0,12", "× похибка", d.MUTED),
          (82, "I 0,02", "інтегратор", d.MUTED)]
 for x, k, sub, col in terms:
-    d.box(dax, x - 5.5, 18, 11, 7.5, k, [sub], title_size=16, line_size=12, ec=col, title_color=col)
-    d.wire(dax, [(x, 25.5), (x, 27.5), (80, 27.5), (80, Y - 4)], "uart")
-d.wire(dax, [(94, Y - 4), (94, 15), (49.5, 15), (49.5, Y - 4)], "uart", arrow="end")
-d.note(dax, 72, 14.4, "зворотний зв'язок: крен −45°, коливання 9 разів за 6 с", size=13, color=d.C["uart"],
+    d.box(dax, x - 5.5, 20.5, 11, 7.5, k, [sub], title_size=16, line_size=12, ec=col, title_color=col)
+    d.wire(dax, [(x, 28.0), (x, 30.0), (80, 30.0), (80, Y - 4)], "uart")
+d.wire(dax, [(94, Y - 4), (94, 17.5), (49.5, 17.5), (49.5, Y - 4)], "uart", arrow="end")
+d.note(dax, 72, 16.9, "зворотний зв'язок: крен −45°, коливання 9 разів за 6 с", size=13, color=d.C["uart"],
        ha="center", va="top")
-d.box(dax, 44, 1, 55.5, 9.5, None)
-d.table(dax, 45, 9.4, [0, 14, 28, 42], [
+d.box(dax, 44, 1, 55.5, 11.0, None)
+d.table(dax, 45, 10.4, [0, 14, 28, 42], [
     ["дані: ATT, PIDR", "момент: 56,8 с", "період ≈ 1,25 с", "загасання 0,67–0,73"],
-    ["EKF XKF4 ≤ 0,4", "HDOP 1,21", "Clip 0", "Starlink: 2–3 зміни"]], size=13.5, row_h=3.6, header=False)
-d.note(dax, 44, 39.5, "Контур швидкості крену (ArduPlane)", size=17, color=d.INK, va="bottom", bold=True)
-d.note(dax, 44, 41.4, "гіпотеза: FF завеликий, P та I замалі", size=14, color=d.C["power"], va="bottom")
+    ["EKF XKF4 ≤ 0,4", "HDOP 1,21", "Clip 0", "Starlink: 2–3 зміни"]], size=13.5, row_h=4.2, header=False)
+d.note(dax, 44, 42.6, "Контур швидкості крену (ArduPlane)", size=17, color=d.INK, va="bottom", bold=True)
+d.note(dax, 44, 44.5, "гіпотеза: FF завеликий, P та I замалі", size=14, color=d.C["power"], va="bottom")
 d.save(fig, "deck_v2/s10_log.png")
