@@ -67,9 +67,9 @@ dax.set_xlim(0, d.W)
 dax.set_ylim(0, d.H)
 dax.axis("off")
 # --- middle column: why alone, the mission ---
-why = ["РЕБ глушить RC, LTE і GNSS: біля", "джерела літак має діяти сам"]
-hw = d.fit_h("Чому автономно", why, 16, 13.5)
-d.box(dax, 37, 46.2 - hw, 30, hw, "Чому автономно", why, title_size=16, line_size=13.5, ec=d.C["power"],
+why = ["джерело завад може впливати на RC,", "LTE, GNSS. Це штатна ситуація"]
+hw = d.fit_h("Місія без RC", why, 16, 13.5)
+d.box(dax, 37, 46.2 - hw, 30, hw, "Місія без RC", why, title_size=16, line_size=13.5, ec=d.C["power"],
       title_color=d.C["power"])
 facts = [f"{len(plan['mission']['items'])} пунктів · ≈ {s[-1]:.0f} км · ≈ 1 год 05 хв",
          "катапульта 3,3 g, зліт до 120 м",
@@ -81,7 +81,7 @@ facts = [f"{len(plan['mission']['items'])} пунктів · ≈ {s[-1]:.0f} к�
 d.box(dax, 37, 0.5, 30, None, "Місія (QGC, SITL)", facts, title_size=16, line_size=13.5)
 
 # --- right column: how the source is located ---
-concept = ["спіральна антена в носі, промінь 30°",
+concept = ["Helix-антена з кутом 30 градусів",
            "сигнал ≥ порога → коло 360°:",
            "антена оглядає всі напрямки,",
            "найсильніший напрямок = пеленг",

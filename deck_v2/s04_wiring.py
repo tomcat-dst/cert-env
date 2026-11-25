@@ -120,6 +120,7 @@ for label, vals in rows:
     y -= n * 1.5 + 0.8
 ax.plot([X0 + 1, X0 + XW - 1], [y + 0.3, y + 0.3], color=d.LINE, lw=1)
 for j, ln in enumerate(["Обрано ArduPilot: місія без RC одним", "параметром, Lua і MAVLink для компаньйона,",
-                        "нативний SITL, логи .BIN.", "PX4 підійшов би теж."]):
+                        "нативний SITL, логи .BIN.", "PX4 підійшов би теж, але в нього",
+                        "складніша архітектура."]):
     d.note(ax, X0 + 1, y - 0.6 - j * 1.6, ln, size=12, color=d.GOOD if j < 3 else d.MUTED, va="top")
 d.save(fig, "deck_v2/s04_wiring.png")
