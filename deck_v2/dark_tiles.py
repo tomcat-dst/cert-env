@@ -18,10 +18,11 @@ TILES["s06"] = TILES["s02"]
 TILES["s07"] = TILES["s02"]
 TILES["s08"] = TILES["s02"]
 TILES["s14"] = TILES["s02"]  # RFSEARCH, after the SITL mission
+TILES["s15"] = TILES["s02"]  # the two RFSEARCH flights (replaces the 23.11 mission slide)
 SRC = {"s02": "s02_hook", "s03": "s03_mission", "s04": "s04_wiring", "s05": "s05_loadouts",
        "s06": "s06_power", "s07": "s07_failsafe", "s08": "s08_sitl", "s09": "s09_flight",
        "s10": "s10_log", "s11": "s11_autotune", "s12": "s12_result", "s13": "s13_next",
-       "s14": "s14_rfsearch"}
+       "s14": "s14_rfsearch", "s15": "s15_scenarios"}
 
 bg = background()
 for key, (x, y, w, h) in TILES.items():
