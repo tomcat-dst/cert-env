@@ -1,0 +1,7 @@
+Loaded plane aero coefficients from @ROMFS/models/skywalker_2013.json
+Starting sketch 'ArduPlane'
+Starting SITL input
+Using Irlock at port : 9005
+bind port 5760 for SERIAL0
+SERIAL0 on TCP port 5760
+Waiting for connection ....

@@ -1,0 +1,7 @@
+[
+ {"label": "±90° вліво-вправо, −95", "sweep_s": 1411, "missed": 0, "median_m": 71, "flight_s": 3562},
+ {"label": "±60°, далі при рості, −95", "sweep_s": 1080, "missed": 0, "median_m": 107, "flight_s": 3313},
+ {"label": "±60°, далі при рості, −90", "sweep_s": 871, "missed": 2, "median_m": 150, "flight_s": 3304},
+ {"label": "коло 360°, −90", "sweep_s": 1206, "missed": 0, "median_m": 61, "flight_s": 3540},
+ {"label": "коло, −90 + гістерезис", "sweep_s": 1390, "missed": 0, "median_m": 52, "flight_s": 3582, "chosen": true}
+]

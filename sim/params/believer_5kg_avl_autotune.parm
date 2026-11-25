@@ -1,0 +1,26 @@
+# AUTOTUNE result for believer-5kg-avl-mfe, 2026-11-22 19:14, compare/autotune.py
+# Tuned in SITL (compare/results/autotune-20261122-191414/believer-5kg-avl-mfe); load after the model's other parameter files.
+# name value   (value before the tune)
+RLL_RATE_P       1.353752   # was 0.1162964
+RLL_RATE_I       0.2966589   # was 0.02416181
+RLL_RATE_D       0.01644059   # was 0
+RLL_RATE_FF      0.2966589   # was 0.5706093
+RLL_RATE_IMAX    0.6666667   # was 0.6666667
+RLL_RATE_FLTT    3.183099   # was 3
+RLL_RATE_FLTD    10   # was 12
+RLL_RATE_FLTE    0   # was 0
+RLL2SRV_TCONST   0.5   # was 0.45
+RLL2SRV_RMAX     75   # was 75
+PTCH_RATE_P      0.7460286   # was 0.1083102
+PTCH_RATE_I      0.5595214   # was 0.05415507
+PTCH_RATE_D      0.01644059   # was 0
+PTCH_RATE_FF     0.2636131   # was 0.5171807
+PTCH_RATE_IMAX   0.6666667   # was 0.6666667
+PTCH_RATE_FLTT   2.122066   # was 3
+PTCH_RATE_FLTD   10   # was 12
+PTCH_RATE_FLTE   0   # was 0
+PTCH2SRV_TCONST  0.75   # was 0.45
+PTCH2SRV_RMAX_UP 75   # was 75
+PTCH2SRV_RMAX_DN 75   # was 75
+AUTOTUNE_LEVEL   6   # was 6
+AUTOTUNE_AXES    7   # was 7

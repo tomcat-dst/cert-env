@@ -1,0 +1,40 @@
+From dacbd6d6cf957a180558fa09566b3493ec6c4911 Mon Sep 17 00:00:00 2001
+From: Vlad Syan <vlad.syan@gmail.com>
+Date: Wed, 25 Nov 2026 10:54:24 +0200
+Subject: [PATCH 3/6] AP_HAL_SITL: airspeed sensor takes EAS, do not divide by
+ EAS2TAS again
+
+SIM_Aircraft already passes the equivalent airspeed. Dividing it by EAS2TAS
+a second time made the simulated pitot under-read by 2.8% at 590 m AMSL and
+about 5.7% at 1190 m, so planes flew faster than commanded. Backport of the
+fix on master (_update_airspeed(float eas)) to 4.7.3.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ libraries/AP_HAL_SITL/sitl_airspeed.cpp | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/libraries/AP_HAL_SITL/sitl_airspeed.cpp b/libraries/AP_HAL_SITL/sitl_airspeed.cpp
+index cf3e666aa1..aa5d0ab978 100644
+--- a/libraries/AP_HAL_SITL/sitl_airspeed.cpp
++++ b/libraries/AP_HAL_SITL/sitl_airspeed.cpp
+@@ -25,13 +25,13 @@ using namespace HALSITL;
+ #define PASCAL_TO_VOLTS(_p) (_p/VOLTS_TO_PASCAL)
+ 
+ /*
+-  convert airspeed in m/s to an airspeed sensor value
++  convert equivalent airspeed (EAS) in m/s to an airspeed sensor value
+  */
+-void SITL_State::_update_airspeed(float true_airspeed)
++void SITL_State::_update_airspeed(float eas)
+ {
+     for (uint8_t i=0; i<AIRSPEED_MAX_SENSORS; i++) {
+         const auto &arspd = _sitl->airspeed[i];
+-        float airspeed = true_airspeed / AP_Baro::get_EAS2TAS_for_alt_amsl(_sitl->state.altitude);
++        float airspeed = eas;
+         const float diff_pressure = sq(airspeed) / arspd.ratio;
+         float airspeed_raw;
+     
+-- 
+2.43.0
+

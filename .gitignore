@@ -1,0 +1,30 @@
+# third-party source trees and toolchains (ArduPilot, QGC, Gazebo, MAVSDK, AVL): see README and patches/
+/src/
+/install/
+/Qt/
+/venv/
+__pycache__/
+
+# simulation output: flight logs, per-run results, SITL state
+/compare/results/
+/logs/
+/deliverables/logs/
+*.BIN
+*.bin
+*.tlog
+*.tlog.raw
+eeprom.bin
+/terrain/
+/sitl-smoke/
+/smoke/gz-run/
+/mav.parm
+
+# deck build intermediates (the scripts are kept; images are rebuilt from them)
+/deck_v2/preview*
+/deck_v2/up_*/
+/deck_v2/dark/
+/deck_v2/*.png
+/deck_v2/*.jpg
+/deck-preview.pdf
+/deliverables/report_check/
+/smoke/qgc-home/

@@ -1,0 +1,966 @@
+From f4450fe92c10ea2fd0e3a8679260c30870527588 Mon Sep 17 00:00:00 2001
+From: Vlad Syan <vlad.syan@gmail.com>
+Date: Wed, 25 Nov 2026 10:54:24 +0200
+Subject: [PATCH 6/6] Plane: add RFSEARCH mode (AUTO with RF sweeps)
+
+RFSEARCH (mode 27, "RFSR") flies the mission like AUTO; it is mode_auto with
+a flag, so every AUTO check (take-off, landing, failsafes, fence) still
+applies. A companion sends its analyzer reading as NAMED_VALUE_FLOAT RF_dBm.
+On a plain waypoint leg, when the smoothed reading is at least RFS_THR_DBM,
+the plane sweeps its nose antenna: by default one full-bank circle (RFS_TYPE
+2 right, 1 left; 0 = left/right legs to RFS_LEG_DEG, extended while the
+signal rises), rolling out onto the leg. Sweeps repeat every RFS_SPACING
+while each sweep peaks above RFS_THR_DBM - RFS_STOP_DB. No sweeps during
+take-off, landing, failsafe or within RFS_MIN_LEG of a waypoint; a landing
+or failsafe entry into AUTO clears the flag.
+
+The sweep phase goes to the companion as NAMED_VALUE_FLOAT RFS_SWP and is
+logged as RFS. Tested in SITL only, with a synthetic companion.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ ArduPlane/GCS_MAVLink_Plane.cpp |  27 ++-
+ ArduPlane/GCS_Plane.cpp         |   1 +
+ ArduPlane/Parameters.cpp        |   4 +
+ ArduPlane/Parameters.h          |   4 +
+ ArduPlane/Plane.cpp             |   1 +
+ ArduPlane/Plane.h               |   1 +
+ ArduPlane/altitude.cpp          |   2 +
+ ArduPlane/avoidance_adsb.cpp    |   5 +-
+ ArduPlane/control_modes.cpp     |   2 +
+ ArduPlane/events.cpp            |   2 +
+ ArduPlane/mode.h                |  16 +-
+ ArduPlane/mode_auto.cpp         |  39 ++++
+ ArduPlane/mode_thermal.cpp      |   3 +-
+ ArduPlane/reverse_thrust.cpp    |   1 +
+ ArduPlane/rf_search.cpp         | 390 ++++++++++++++++++++++++++++++++
+ ArduPlane/rf_search.h           | 117 ++++++++++
+ ArduPlane/system.cpp            |  41 ++++
+ 17 files changed, 648 insertions(+), 8 deletions(-)
+ create mode 100644 ArduPlane/rf_search.cpp
+ create mode 100644 ArduPlane/rf_search.h
+
+diff --git a/ArduPlane/GCS_MAVLink_Plane.cpp b/ArduPlane/GCS_MAVLink_Plane.cpp
+index 48abe7b35b..0b8c6a4e60 100644
+--- a/ArduPlane/GCS_MAVLink_Plane.cpp
++++ b/ArduPlane/GCS_MAVLink_Plane.cpp
+@@ -52,6 +52,7 @@ uint8_t GCS_MAVLINK_Plane::base_mode() const
+         _base_mode = MAV_MODE_FLAG_STABILIZE_ENABLED;
+         break;
+     case Mode::Number::AUTO:
++    case Mode::Number::RFSEARCH:
+     case Mode::Number::RTL:
+     case Mode::Number::LOITER:
+     case Mode::Number::THERMAL:
+@@ -1028,6 +1029,18 @@ void GCS_MAVLINK_Plane::handle_message(const mavlink_message_t &msg)
+         handle_set_position_target_global_int(msg);
+         break;
+ 
++    case MAVLINK_MSG_ID_NAMED_VALUE_FLOAT: {
++        // the companion's RF analyzer reading drives RFSEARCH sweeps
++        mavlink_named_value_float_t packet;
++        mavlink_msg_named_value_float_decode(&msg, &packet);
++        if (strncmp(packet.name, "RF_dBm", sizeof(packet.name)) == 0) {
++            plane.g2.rf_search.handle_rf_dbm(packet.value);
++        }
++        // still logged as NVAL
++        GCS_MAVLINK::handle_message(msg);
++        break;
++    }
++
+     default:
+         GCS_MAVLINK::handle_message(msg);
+         break;
+@@ -1335,7 +1348,8 @@ uint8_t GCS_MAVLINK_Plane::send_available_mode(uint8_t index) const
+ #endif
+     };
+ 
+-    const uint8_t fw_mode_count = ARRAY_SIZE(fw_modes);
++    // plus RFSEARCH, which is mode_auto under another number
++    const uint8_t fw_mode_count = ARRAY_SIZE(fw_modes) + 1;
+ 
+     // Fixedwing modes are always present
+     uint8_t mode_count = fw_mode_count;
+@@ -1373,7 +1387,16 @@ uint8_t GCS_MAVLINK_Plane::send_available_mode(uint8_t index) const
+     const char* name;
+     Mode::Number mode_number;
+ 
+-    if (index_zero < fw_mode_count) {
++    if (index_zero == ARRAY_SIZE(fw_modes)) {
++        name = "RFSearch";
++        mode_number = Mode::Number::RFSEARCH;
++
++    } else if (fw_modes[index_zero] == &plane.mode_auto) {
++        // not from the object: it answers RFSEARCH while flying as such
++        name = "Auto";
++        mode_number = Mode::Number::AUTO;
++
++    } else if (index_zero < fw_mode_count) {
+         // A fixedwing mode
+         name = fw_modes[index_zero]->name();
+         mode_number = fw_modes[index_zero]->mode_number();
+diff --git a/ArduPlane/GCS_Plane.cpp b/ArduPlane/GCS_Plane.cpp
+index c2cc070da7..5982fabeb1 100644
+--- a/ArduPlane/GCS_Plane.cpp
++++ b/ArduPlane/GCS_Plane.cpp
+@@ -59,6 +59,7 @@ void GCS_Plane::update_vehicle_sensor_status_flags(void)
+         break;
+ 
+     case Mode::Number::AUTO:
++    case Mode::Number::RFSEARCH:
+     case Mode::Number::RTL:
+     case Mode::Number::LOITER:
+     case Mode::Number::AVOID_ADSB:
+diff --git a/ArduPlane/Parameters.cpp b/ArduPlane/Parameters.cpp
+index 4532e91156..64fe83dc9c 100644
+--- a/ArduPlane/Parameters.cpp
++++ b/ArduPlane/Parameters.cpp
+@@ -1279,6 +1279,10 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
+     // @User: Advanced
+     AP_GROUPINFO("GUIDED_TIMEOUT", 40, ParametersG2, guided_timeout, 3.0f),
+ 
++    // @Group: RFS_
++    // @Path: rf_search.cpp
++    AP_SUBGROUPINFO(rf_search, "RFS_", 41, ParametersG2, RFSearch),
++
+     AP_GROUPEND
+ };
+ 
+diff --git a/ArduPlane/Parameters.h b/ArduPlane/Parameters.h
+index 06066e8878..34c5fbc97a 100644
+--- a/ArduPlane/Parameters.h
++++ b/ArduPlane/Parameters.h
+@@ -3,6 +3,7 @@
+ #define AP_PARAM_VEHICLE_NAME plane
+ 
+ #include <AP_Common/AP_Common.h>
++#include "rf_search.h"
+ 
+ // Global parameter class.
+ //
+@@ -595,6 +596,9 @@ public:
+ #if AP_PLANE_SYSTEMID_ENABLED
+     AP_SystemID systemid;
+ #endif
++
++    // RFSEARCH mode sweeps
++    RFSearch rf_search;
+ };
+ 
+ extern const AP_Param::Info var_info[];
+diff --git a/ArduPlane/Plane.cpp b/ArduPlane/Plane.cpp
+index 6cc6205967..b28fd6b221 100644
+--- a/ArduPlane/Plane.cpp
++++ b/ArduPlane/Plane.cpp
+@@ -927,6 +927,7 @@ bool Plane::get_target_location(Location& target_loc)
+     case Mode::Number::AVOID_ADSB:
+     case Mode::Number::GUIDED:
+     case Mode::Number::AUTO:
++    case Mode::Number::RFSEARCH:
+     case Mode::Number::LOITER:
+     case Mode::Number::TAKEOFF:
+ #if HAL_QUADPLANE_ENABLED
+diff --git a/ArduPlane/Plane.h b/ArduPlane/Plane.h
+index 9ecb989ba5..593301ef0b 100644
+--- a/ArduPlane/Plane.h
++++ b/ArduPlane/Plane.h
+@@ -158,6 +158,7 @@ public:
+     friend class ModeCruise;
+     friend class ModeAutoTune;
+     friend class ModeAuto;
++    friend class RFSearch;
+     friend class ModeRTL;
+     friend class ModeLoiter;
+     friend class ModeAvoidADSB;
+diff --git a/ArduPlane/altitude.cpp b/ArduPlane/altitude.cpp
+index 73d1466d68..bb86dd3f96 100644
+--- a/ArduPlane/altitude.cpp
++++ b/ArduPlane/altitude.cpp
+@@ -77,6 +77,7 @@ void Plane::setup_alt_slope(void)
+         break;
+ 
+     case Mode::Number::AUTO:
++    case Mode::Number::RFSEARCH:
+         // climb without doing slope if option is enabled
+         if (!above_location_current(next_WP_loc) && plane.flight_option_enabled(FlightOptions::IMMEDIATE_CLIMB_IN_AUTO)) {
+             reset_offset_altitude();
+@@ -852,6 +853,7 @@ const Plane::TerrainLookupTable Plane::Terrain_lookup[] = {
+     {Mode::Number::FLY_BY_WIRE_B, terrain_bitmask::FLY_BY_WIRE_B},
+     {Mode::Number::CRUISE, terrain_bitmask::CRUISE},
+     {Mode::Number::AUTO, terrain_bitmask::AUTO},
++    {Mode::Number::RFSEARCH, terrain_bitmask::AUTO},
+     {Mode::Number::RTL, terrain_bitmask::RTL},
+     {Mode::Number::AVOID_ADSB, terrain_bitmask::AVOID_ADSB},
+     {Mode::Number::GUIDED, terrain_bitmask::GUIDED},
+diff --git a/ArduPlane/avoidance_adsb.cpp b/ArduPlane/avoidance_adsb.cpp
+index 93c633a8e9..2fd069cd1b 100644
+--- a/ArduPlane/avoidance_adsb.cpp
++++ b/ArduPlane/avoidance_adsb.cpp
+@@ -140,8 +140,9 @@ void AP_Avoidance_Plane::handle_recovery(RecoveryAction recovery_action)
+                 break;
+ 
+             case RecoveryAction::RESUME_IF_AUTO_ELSE_LOITER:
+-                if (prev_control_mode_number == Mode::Number::AUTO) {
+-                    plane.set_mode(plane.mode_auto, ModeReason::AVOIDANCE_RECOVERY);
++                if (prev_control_mode_number == Mode::Number::AUTO ||
++                    prev_control_mode_number == Mode::Number::RFSEARCH) {
++                    plane.set_mode_by_number(prev_control_mode_number, ModeReason::AVOIDANCE_RECOVERY);
+                 } else {
+                     // let ModeAvoidADSB continue in its guided
+                     // behaviour, but reset the loiter location,
+diff --git a/ArduPlane/control_modes.cpp b/ArduPlane/control_modes.cpp
+index 5d07b45534..107deb6e68 100644
+--- a/ArduPlane/control_modes.cpp
++++ b/ArduPlane/control_modes.cpp
+@@ -35,6 +35,8 @@ Mode *Plane::mode_from_mode_num(const enum Mode::Number num)
+         ret = &mode_autotune;
+         break;
+     case Mode::Number::AUTO:
++    case Mode::Number::RFSEARCH:
++        // the same object; set_mode_by_number() sets which of the two it is
+         ret = &mode_auto;
+         break;
+     case Mode::Number::RTL:
+diff --git a/ArduPlane/events.cpp b/ArduPlane/events.cpp
+index c48b903a7f..64fe40c1ef 100644
+--- a/ArduPlane/events.cpp
++++ b/ArduPlane/events.cpp
+@@ -65,6 +65,7 @@ void Plane::rc_failsafe_short_on_event()
+ #endif // HAL_QUADPLANE_ENABLED
+ 
+     case Mode::Number::AUTO:
++    case Mode::Number::RFSEARCH:
+ #if MODE_AUTOLAND_ENABLED
+     case Mode::Number::AUTOLAND:
+ #endif
+@@ -182,6 +183,7 @@ void Plane::failsafe_long_on_event(enum failsafe_state fstype, ModeReason reason
+ #endif  // HAL_QUADPLANE_ENABLED
+ 
+     case Mode::Number::AUTO:
++    case Mode::Number::RFSEARCH:
+         if (failsafe_in_landing_sequence()) {
+             // don't failsafe in a landing sequence
+             break;
+diff --git a/ArduPlane/mode.h b/ArduPlane/mode.h
+index 9bae00e73a..3214d37e16 100644
+--- a/ArduPlane/mode.h
++++ b/ArduPlane/mode.h
+@@ -70,6 +70,7 @@ public:
+ #if MODE_AUTOLAND_ENABLED
+         AUTOLAND      = 26,
+ #endif
++        RFSEARCH      = 27,     // AUTO with RF direction-finding sweeps, see rf_search.h
+ 
+     // Mode number 30 reserved for "offboard" for external/lua control.
+     };
+@@ -257,9 +258,13 @@ class ModeAuto : public Mode
+ public:
+     friend class Plane;
+ 
+-    Number mode_number() const override { return Number::AUTO; }
+-    const char *name() const override { return "Auto"; }
+-    const char *name4() const override { return "AUTO"; }
++    // RFSEARCH is this mode with rf_search set: same object, so all the AUTO checks still hold
++    Number mode_number() const override { return rf_search ? Number::RFSEARCH : Number::AUTO; }
++    const char *name() const override { return rf_search ? "RFSearch" : "Auto"; }
++    const char *name4() const override { return rf_search ? "RFSR" : "AUTO"; }
++
++    void set_rf_search(bool enable);
++    bool rf_search_enabled() const { return rf_search; }
+ 
+     bool does_automatic_thermal_switch() const override { return true; }
+ 
+@@ -307,6 +312,11 @@ protected:
+ 
+ private:
+ 
++    // flying as RFSEARCH; only set_mode_by_number() changes it
++    bool rf_search = false;
++    bool rf_sweeping = false;
++    bool rf_search_leg_ok();
++
+     // Delay the next navigation command
+     struct {
+         uint32_t time_max_ms;
+diff --git a/ArduPlane/mode_auto.cpp b/ArduPlane/mode_auto.cpp
+index 3c12119245..32fc9e291e 100644
+--- a/ArduPlane/mode_auto.cpp
++++ b/ArduPlane/mode_auto.cpp
+@@ -3,6 +3,9 @@
+ 
+ bool ModeAuto::_enter()
+ {
++    // RFSEARCH: track distance afresh; the first valid reading may start a sweep
++    plane.g2.rf_search.reset();
++
+ #if HAL_QUADPLANE_ENABLED
+     // check if we should refuse auto mode due to a missing takeoff in
+     // guided_wait_takeoff state
+@@ -44,6 +47,9 @@ bool ModeAuto::_enter()
+ 
+ void ModeAuto::_exit()
+ {
++    // RFSEARCH: hand the steering back with the sweep reported over
++    plane.g2.rf_search.abort("aborted, mode change");
++
+     if (plane.mission.state() == AP_Mission::MISSION_RUNNING) {
+         plane.mission.stop();
+ 
+@@ -124,10 +130,43 @@ void ModeAuto::update()
+ void ModeAuto::navigate()
+ {
+     if (AP::ahrs().home_is_set()) {
++        if (rf_search &&
++            plane.g2.rf_search.update(plane.current_loc, plane.prev_WP_loc, plane.next_WP_loc, rf_search_leg_ok())) {
++            // a sweep owns the steering; the mission carries on when it ends
++            rf_sweeping = true;
++            return;
++        }
++        if (rf_sweeping) {
++            // the sweep has moved the aircraft off the leg: fly on from here rather than cutting back
++            // across to the old track line (an S-turn after every sweep)
++            rf_sweeping = false;
++            plane.prev_WP_loc = plane.current_loc;
++        }
+         plane.mission.update();
+     }
+ }
+ 
++void ModeAuto::set_rf_search(bool enable)
++{
++    if (enable != rf_search) {
++        plane.g2.rf_search.abort("aborted, now AUTO");
++        plane.g2.rf_search.reset();
++    }
++    rf_search = enable;
++}
++
++// sweeps only on a plain waypoint leg in normal flight: not taking off, landing or in failsafe
++bool ModeAuto::rf_search_leg_ok()
++{
++    return plane.mission.get_current_nav_cmd().id == MAV_CMD_NAV_WAYPOINT &&
++           plane.flight_stage == AP_FixedWing::FlightStage::NORMAL &&
++           !plane.mission.get_in_landing_sequence_flag() &&
++           plane.is_flying() &&
++           !plane.failsafe.rc_failsafe &&
++           plane.failsafe.state == FAILSAFE_NONE &&
++           !AP::battery().has_failsafed();
++}
++
+ 
+ bool ModeAuto::does_auto_navigation() const
+ {
+diff --git a/ArduPlane/mode_thermal.cpp b/ArduPlane/mode_thermal.cpp
+index 3ce4ce02f0..51074be3ab 100644
+--- a/ArduPlane/mode_thermal.cpp
++++ b/ArduPlane/mode_thermal.cpp
+@@ -43,7 +43,7 @@ void ModeThermal::update_soaring()
+     // Check distance to home against MAX_RADIUS.
+     if (plane.g2.soaring_controller.max_radius >= 0 &&
+         sq(position.x)+sq(position.y) > sq(plane.g2.soaring_controller.max_radius) &&
+-        plane.previous_mode->mode_number()!=Mode::Number::AUTO) {
++        plane.previous_mode != &plane.mode_auto) {
+         // Some other loiter status, and outside of maximum soaring radius, and previous mode wasn't AUTO
+         gcs().send_text(MAV_SEVERITY_INFO, "Soaring: Outside SOAR_MAX_RADIUS, RTL");
+         plane.set_mode(plane.mode_rtl, ModeReason::SOARING_DRIFT_EXCEEDED);
+@@ -125,6 +125,7 @@ bool ModeThermal::exit_heading_aligned() const
+     // Return true if the current heading is aligned with the next objective.
+     // If home is not set, or heading not locked, return true to avoid delaying mode change.
+     switch (plane.previous_mode->mode_number()) {
++    case Mode::Number::RFSEARCH:
+     case Mode::Number::AUTO: {
+         //Get the lat/lon of next Nav waypoint after this one:
+         AP_Mission::Mission_Command current_nav_cmd = plane.mission.get_current_nav_cmd();
+diff --git a/ArduPlane/reverse_thrust.cpp b/ArduPlane/reverse_thrust.cpp
+index ed560090c1..37e6d68b8e 100644
+--- a/ArduPlane/reverse_thrust.cpp
++++ b/ArduPlane/reverse_thrust.cpp
+@@ -38,6 +38,7 @@ bool Plane::allow_reverse_thrust(void) const
+ 
+     switch (control_mode->mode_number()) {
+     case Mode::Number::AUTO:
++    case Mode::Number::RFSEARCH:
+         {
+         uint16_t nav_cmd = mission.get_current_nav_cmd().id;
+ 
+diff --git a/ArduPlane/rf_search.cpp b/ArduPlane/rf_search.cpp
+new file mode 100644
+index 0000000000..8a3254c301
+--- /dev/null
++++ b/ArduPlane/rf_search.cpp
+@@ -0,0 +1,390 @@
++#include "Plane.h"
++#include "rf_search.h"
++
++// longest a sweep may own the steering before it is abandoned
++static const uint32_t SWEEP_TIMEOUT_MS = 90000;
++// readings within this yaw of each other are averaged when looking for the peak (fading)
++static const float PEAK_SMOOTH_DEG = 7.5f;
++// a phase is complete when it has this little left to turn
++static const float PHASE_DONE_DEG = 5.0f;
++// EMA weight of a new reading in the smoothed level used for detection
++static const float SMOOTH_ALPHA = 0.3f;
++
++const AP_Param::GroupInfo RFSearch::var_info[] = {
++    // @Param: ENABLE
++    // @DisplayName: RF search enable
++    // @Description: Enables sweeps in RFSEARCH mode. With 0, RFSEARCH flies the mission exactly like AUTO.
++    // @Values: 0:Disabled,1:Enabled
++    // @User: Standard
++    AP_GROUPINFO_FLAGS("ENABLE", 1, RFSearch, _enable, 1, AP_PARAM_FLAG_ENABLE),
++
++    // @Param: THR_DBM
++    // @DisplayName: RF detection threshold
++    // @Description: Smoothed RF_dBm reading above which a sweep is started.
++    // @Units: dBm
++    // @Range: -120 0
++    // @User: Standard
++    AP_GROUPINFO("THR_DBM", 2, RFSearch, _thr_dbm, -90.0f),
++
++    // @Param: SPACING
++    // @DisplayName: Sweep spacing
++    // @Description: Track distance between sweeps while the signal is above the threshold.
++    // @Units: m
++    // @Range: 500 20000
++    // @User: Standard
++    AP_GROUPINFO("SPACING", 3, RFSearch, _spacing_m, 3000.0f),
++
++    // @Param: MIN_LEG
++    // @DisplayName: Minimum distance to the next waypoint
++    // @Description: No sweep starts closer than this to the next waypoint, or closer than a third of it to the previous one.
++    // @Units: m
++    // @Range: 300 10000
++    // @User: Standard
++    AP_GROUPINFO("MIN_LEG", 4, RFSearch, _min_leg_m, 1500.0f),
++
++    // @Param: STALE
++    // @DisplayName: RF reading timeout
++    // @Description: A reading older than this does not count as a signal.
++    // @Units: s
++    // @Range: 0.5 10
++    // @User: Advanced
++    AP_GROUPINFO("STALE", 7, RFSearch, _stale_s, 2.0f),
++
++    // 5, 6, 8 and 9 were PEAK_DB, PEAK_DEG, EXT_DB and EXT_DEG
++
++    // @Param: LEG_DEG
++    // @DisplayName: Sweep leg angle
++    // @Description: How far either side of the course a sweep leg turns, unless the signal is still rising there (see RFS_PAST_DEG).
++    // @Units: deg
++    // @Range: 30 180
++    // @User: Standard
++    AP_GROUPINFO("LEG_DEG", 10, RFSearch, _leg_deg, 60.0f),
++
++    // @Param: PAST_DEG
++    // @DisplayName: Sweep past the peak
++    // @Description: A sweep leg beyond RFS_LEG_DEG carries on while its strongest reading is less than this behind the heading, that is while the signal is still rising, so the peak ends up inside the swept arc. About half the antenna's beamwidth.
++    // @Units: deg
++    // @Range: 5 45
++    // @User: Advanced
++    AP_GROUPINFO("PAST_DEG", 11, RFSearch, _past_deg, 15.0f),
++
++    // @Param: STOP_DB
++    // @DisplayName: Sweep threshold hysteresis
++    // @Description: Once a sweep has started, sweeps carry on every RFS_SPACING while each sweep's strongest smoothed reading stays above RFS_THR_DBM less this, whatever the reading on the leg; after a sweep peaks below that, the next one needs RFS_THR_DBM again. With legs, a reading this far below RFS_THR_DBM (beyond the strongest one) is also the hard stop for a leg. Keeps the search from stopping on the first fade.
++    // @Units: dB
++    // @Range: 0 20
++    // @User: Advanced
++    AP_GROUPINFO("STOP_DB", 12, RFSearch, _stop_db, 5.0f),
++
++    // @Param: TYPE
++    // @DisplayName: Sweep pattern
++    // @Description: Left and right legs (see RFS_LEG_DEG), or one full circle at full bank, left or right, then back onto the leg.
++    // @Values: 0:Legs,1:Circle left,2:Circle right
++    // @User: Standard
++    AP_GROUPINFO("TYPE", 13, RFSearch, _type, 2),
++
++    AP_GROUPEND
++};
++
++RFSearch::RFSearch()
++{
++    AP_Param::setup_object_defaults(this, var_info);
++    reset();
++}
++
++void RFSearch::reset()
++{
++    _state = State::TRACK;
++    _have_last_pos = false;
++    // the first valid reading starts a sweep straight away
++    _dist_since_m = 1e7f;
++    _engaged = false;
++    _nsamples = 0;
++    _leg_first = 0;
++    _last_report_ms = 0;
++}
++
++bool RFSearch::signal_valid() const
++{
++    // a search under way (the last sweep's strongest reading was over the threshold less RFS_STOP_DB) carries
++    // on whatever the nose antenna reads on the leg: the source is usually off to the side
++    return _have_rf &&
++           AP_HAL::millis() - _last_rf_ms < uint32_t(_stale_s * 1000) &&
++           (_engaged || _smooth_dbm >= _thr_dbm);
++}
++
++void RFSearch::handle_rf_dbm(float dbm)
++{
++    const uint32_t now = AP_HAL::millis();
++    if (!_have_rf || now - _last_rf_ms > uint32_t(_stale_s * 1000)) {
++        _smooth_dbm = dbm;
++    } else {
++        _smooth_dbm += SMOOTH_ALPHA * (dbm - _smooth_dbm);
++    }
++    _have_rf = true;
++    _last_rf_ms = now;
++
++    if (_state != State::TRACK) {
++        _sweep_peak_dbm = MAX(_sweep_peak_dbm, _smooth_dbm);
++    }
++    if (_state != State::TRACK && _state != State::RETURN && _nsamples < MAX_SAMPLES) {
++        _samples[_nsamples++] = { wrap_360(AP::ahrs().get_yaw_deg()), _off_deg, dbm };
++    }
++}
++
++/*
++  readings averaged over neighbours within PEAK_SMOOTH_DEG of heading (against fading) into _smoothed[],
++  and the strongest of them
++ */
++void RFSearch::find_peak()
++{
++    float max_dbm = -1000;
++    float max_yaw = 0;
++    float leg_max_dbm = -1000;
++    for (uint16_t i = 0; i < _nsamples; i++) {
++        float sum = 0;
++        uint16_t n = 0;
++        for (uint16_t j = 0; j < _nsamples; j++) {
++            if (fabsf(wrap_180(_samples[j].yaw_deg - _samples[i].yaw_deg)) <= PEAK_SMOOTH_DEG) {
++                sum += _samples[j].dbm;
++                n++;
++            }
++        }
++        _smoothed[i] = sum / n;
++        if (_smoothed[i] > max_dbm) {
++            max_dbm = _smoothed[i];
++            max_yaw = _samples[i].yaw_deg;
++        }
++        if (i >= _leg_first && _smoothed[i] > leg_max_dbm) {
++            leg_max_dbm = _smoothed[i];
++            _leg_max_off_deg = _samples[i].off_deg;
++        }
++    }
++    _max_dbm = max_dbm;
++    _max_yaw_deg = max_yaw;
++}
++
++void RFSearch::start_leg(State state)
++{
++    _state = state;
++    _dir = state == State::LEFT ? -1 : 1;
++    _extending = false;
++    _leg_first = _nsamples;
++    _leg_max_off_deg = _off_deg;
++    report_state();
++    log_state();
++}
++
++void RFSearch::start_sweep(const Location &here, const Location &next_wp)
++{
++    _sweeps++;
++    _sweep_peak_dbm = _smooth_dbm;
++    _course_deg = here.get_bearing_to(next_wp) * 0.01f;
++    _prev_yaw_deg = wrap_360(AP::ahrs().get_yaw_deg());
++    _off_deg = wrap_180(_prev_yaw_deg - _course_deg);
++    _nsamples = 0;
++    _max_dbm = -1000;
++    _max_yaw_deg = 0;
++    _start_ms = AP_HAL::millis();
++    _dist_since_m = 0;
++    gcs().send_text(MAV_SEVERITY_INFO, "RFS: sweep %u, course %.0f, %.1f dBm",
++                    unsigned(_sweeps), double(_course_deg), double(_smooth_dbm));
++    // a circle is one leg all the way round
++    _circle = _type != 0;
++    start_leg(_type == 2 ? State::RIGHT : State::LEFT);
++}
++
++/*
++  a leg is over: the left one hands over to the right one, the right one to the turn back onto the leg
++ */
++void RFSearch::end_leg(const Location &here, const Location &next_wp, float yaw, const char *why)
++{
++    if (why != nullptr) {
++        gcs().send_text(MAV_SEVERITY_INFO, "RFS: sweep %u %s at %.0f", unsigned(_sweeps), why, double(yaw));
++    }
++    if (_state == State::LEFT) {
++        // the right leg sweeps back across to RFS_LEG_DEG right and turns back again; when going on round
++        // is shorter than that, go on round (it sees the right side too)
++        const float reach = -_off_deg;
++        if (360 - reach <= reach + 2 * _leg_deg) {
++            gcs().send_text(MAV_SEVERITY_INFO, "RFS: sweep %u full circle from %.0f left", unsigned(_sweeps), double(reach));
++            circle_back(here, next_wp);
++        } else {
++            start_leg(State::RIGHT);
++        }
++        return;
++    }
++    // back onto the leg as it is now from here, not the course the sweep started on
++    const float course = here.get_bearing_to(next_wp) * 0.01f;
++    _off_deg -= wrap_180(course - _course_deg);
++    _course_deg = course;
++    // how far past the course we are in the direction we are rolling: turn back against the roll, unless
++    // that is more than 180 deg (then keep rolling round the full circle) or the course is still ahead
++    const float past = _dir * _off_deg;
++    if (past <= 0) {
++        _phase_angle_deg = -past;
++    } else if (past > 180) {
++        _phase_angle_deg = 360 - past;
++        gcs().send_text(MAV_SEVERITY_INFO, "RFS: sweep %u full circle back to course", unsigned(_sweeps));
++    } else {
++        _phase_angle_deg = past;
++        _dir = -_dir;
++    }
++    _phase_turn_deg = 0;
++    _state = State::RETURN;
++    report_state();
++    log_state();
++}
++
++void RFSearch::circle_back(const Location &here, const Location &next_wp)
++{
++    const float course = here.get_bearing_to(next_wp) * 0.01f;
++    _off_deg -= wrap_180(course - _course_deg);
++    _course_deg = course;
++    _phase_angle_deg = MAX(360 - _dir * _off_deg, 0);
++    _phase_turn_deg = 0;
++    _state = State::RETURN;
++    report_state();
++    log_state();
++}
++
++void RFSearch::abort(const char *why)
++{
++    if (_state != State::TRACK) {
++        end_sweep(why);
++    }
++}
++
++void RFSearch::end_sweep(const char *why)
++{
++    gcs().send_text(MAV_SEVERITY_INFO, "RFS: sweep %u %s, %u readings, peak %.1f dBm",
++                    unsigned(_sweeps), why, unsigned(_nsamples), double(_sweep_peak_dbm));
++    // hysteresis on what the whole sweep saw, not on the heading the leg happens to point at
++    const bool engaged = _sweep_peak_dbm >= _thr_dbm - _stop_db;
++    if (_engaged && !engaged) {
++        gcs().send_text(MAV_SEVERITY_INFO, "RFS: peak under %.0f dBm, search paused", double(_thr_dbm - _stop_db));
++    }
++    _engaged = engaged;
++    _state = State::TRACK;
++    _dist_since_m = 0;
++    report_state();
++    log_state();
++}
++
++bool RFSearch::update(const Location &here, const Location &prev_wp, const Location &next_wp, bool leg_ok)
++{
++    const uint32_t now = AP_HAL::millis();
++
++    if (_have_last_pos) {
++        _dist_since_m += _last_pos.get_distance(here);
++    }
++    _last_pos = here;
++    _have_last_pos = true;
++
++    if (now - _last_report_ms >= 1000) {
++        report_state();
++    }
++
++    if (_state == State::TRACK) {
++        if (_enable && leg_ok && signal_valid() &&
++            _dist_since_m >= _spacing_m &&
++            here.get_distance(next_wp) >= _min_leg_m &&
++            here.get_distance(prev_wp) >= _min_leg_m / 3) {
++            start_sweep(here, next_wp);
++        } else {
++            return false;
++        }
++    }
++
++    if (!_enable || !leg_ok) {
++        end_sweep("aborted");
++        return false;
++    }
++    if (now - _start_ms > SWEEP_TIMEOUT_MS) {
++        end_sweep("timed out");
++        return false;
++    }
++
++    // turned since the last update
++    const float yaw = wrap_360(AP::ahrs().get_yaw_deg());
++    const float turned = wrap_180(yaw - _prev_yaw_deg);
++    _prev_yaw_deg = yaw;
++    _off_deg += turned;
++
++    if (_state == State::LEFT || _state == State::RIGHT) {
++        // the same rules for both legs; reach: how far this leg's side of the course we are
++        const float reach = _dir * _off_deg;
++        bool below = false, rising = false;
++        if (_nsamples - _leg_first >= 3) {
++            find_peak();
++            const float level = _smoothed[_nsamples - 1];
++            // below the threshold (less the margin) beyond the strongest reading in the leg's direction: a hard stop
++            below = level < _thr_dbm - _stop_db && _dir * wrap_180(yaw - _max_yaw_deg) > PEAK_SMOOTH_DEG;
++            // the leg's strongest reading is recent: the signal is still rising, the peak may be further round
++            rising = _max_dbm >= _thr_dbm && _dir * (_off_deg - _leg_max_off_deg) < _past_deg;
++        }
++        if (_circle) {
++            // the last quarter rolls out onto the leg as it is now from here
++            if (reach >= 270) {
++                circle_back(here, next_wp);
++            }
++        } else if (reach >= 360 - PHASE_DONE_DEG) {
++            // followed a rising signal all the way round: that is everything there is to see
++            gcs().send_text(MAV_SEVERITY_INFO, "RFS: sweep %u rising all round", unsigned(_sweeps));
++            circle_back(here, next_wp);
++        } else if (below) {
++            end_leg(here, next_wp, yaw, "below threshold");
++        } else if (reach >= _leg_deg - PHASE_DONE_DEG) {
++            if (!rising) {
++                end_leg(here, next_wp, yaw, _extending ? "past the peak" : nullptr);
++            } else if (!_extending) {
++                _extending = true;
++                gcs().send_text(MAV_SEVERITY_INFO, "RFS: sweep %u rising at %.0f, extending",
++                                unsigned(_sweeps), double(_leg_deg.get()));
++            }
++        }
++    } else if (_state == State::RETURN) {
++        _phase_turn_deg += _dir * turned;
++    }
++
++    if (_state == State::RETURN && _phase_angle_deg - _phase_turn_deg < PHASE_DONE_DEG) {
++        end_sweep("done");
++        return false;
++    }
++
++    // a heading demand at most 90 deg ahead keeps the turn direction unambiguous. The legs hold full
++    // bank to their end (a reversal or the turn back); only the turn back rolls out onto the course
++    const float step = _state == State::RETURN ? constrain_float(_phase_angle_deg - _phase_turn_deg, 0, 90) : 90;
++    plane.nav_controller->update_heading_hold(int32_t(wrap_360(yaw + _dir * step) * 100));
++    return true;
++}
++
++void RFSearch::report_state()
++{
++    _last_report_ms = AP_HAL::millis();
++    // the companion splits its readings into sweeps on this: 0 tracking, 1..4 sweep phases
++    gcs().send_named_float("RFS_SWP", float(uint8_t(_state)));
++}
++
++void RFSearch::log_state() const
++{
++    // @LoggerMessage: RFS
++    // @Description: RF search sweep state
++    // @Field: TimeUS: Time since system startup
++    // @Field: St: state, 0 tracking, 1 left leg, 2 right leg, 4 turn back onto the leg
++    // @Field: N: sweep number
++    // @Field: Crs: course the sweep is measured from (bearing to the next waypoint)
++    // @Field: Yaw: heading
++    // @Field: dBm: smoothed RF reading
++    // @Field: Max: strongest smoothed reading of the sweep
++    // @Field: MaxY: heading of the strongest reading
++    AP::logger().Write("RFS", "TimeUS,St,N,Crs,Yaw,dBm,Max,MaxY", "QBHfffff",
++                       AP_HAL::micros64(),
++                       uint8_t(_state),
++                       _sweeps,
++                       _course_deg,
++                       wrap_360(AP::ahrs().get_yaw_deg()),
++                       _smooth_dbm,
++                       _max_dbm,
++                       _max_yaw_deg);
++}
+diff --git a/ArduPlane/rf_search.h b/ArduPlane/rf_search.h
+new file mode 100644
+index 0000000000..c13881b77d
+--- /dev/null
++++ b/ArduPlane/rf_search.h
+@@ -0,0 +1,117 @@
++#pragma once
++
++/*
++  RF search (RFSEARCH flight mode): fly the mission like AUTO, and while the companion's RF reading
++  (NAMED_VALUE_FLOAT "RF_dBm") is above a threshold, sweep the nose-mounted antenna every RFS_SPACING
++  metres of track: a left leg to RFS_LEG_DEG left of the course, a right leg through the course to RFS_LEG_DEG
++  right of it, then a turn back onto the leg. Both legs follow the same rules, at full bank:
++  - a reading RFS_STOP_DB below RFS_THR_DBM beyond the strongest one is a hard stop for that direction;
++  Once a sweep has started, sweeps carry on every RFS_SPACING while each one's strongest reading stays above
++  RFS_THR_DBM less RFS_STOP_DB, whatever the nose reads on the leg in between.
++  - at RFS_LEG_DEG a leg ends, unless the signal is still rising: it carries on while the leg's strongest
++    reading is less than RFS_PAST_DEG behind the heading, so the peak ends up inside the swept arc.
++  A left leg that went so far round that going on round the circle is shorter than the right leg and the turn
++  back does that instead, with no right leg. The turn back after the right leg reverses the roll, unless that
++  would be more than 180 deg: then it keeps rolling the same way round the full circle.
++  With RFS_TYPE a circle instead, a sweep is one full-bank turn all the way round, left or right.
++
++  RFSEARCH is not a separate mode object: it is mode_auto with its rf_search flag set, so every
++  AUTO-specific check in ArduPlane (take-off, landing, altitude, failsafes by identity) still applies.
++ */
++
++#include <AP_Param/AP_Param.h>
++#include <AP_Common/Location.h>
++
++class RFSearch {
++public:
++    RFSearch();
++
++    static const struct AP_Param::GroupInfo var_info[];
++
++    // a reading from the companion's analyzer, dBm
++    void handle_rf_dbm(float dbm);
++
++    // on entering RFSEARCH: no sweep in progress, the first valid reading may start one
++    void reset();
++
++    // leaving RFSEARCH: end a sweep in progress (reported, so the companion closes it too)
++    void abort(const char *why);
++
++    // called from ModeAuto::navigate() in RFSEARCH at the navigation rate. leg_ok: on a plain
++    // waypoint leg, not taking off, landing or in failsafe. Returns true while a sweep owns the
++    // steering (the mission is then not updated)
++    bool update(const Location &here, const Location &prev_wp, const Location &next_wp, bool leg_ok);
++
++    bool sweeping() const { return _state != State::TRACK; }
++
++private:
++    enum class State : uint8_t {
++        TRACK  = 0,     // following the mission leg
++        LEFT   = 1,     // left leg: to RFS_LEG_DEG left of the course (or further, see above)
++        RIGHT  = 2,     // right leg: through the course to RFS_LEG_DEG right of it
++        // 3 was a fixed 90 deg turn back, no longer used
++        RETURN = 4,     // back onto the leg
++    };
++
++    AP_Int8  _enable;
++    AP_Float _thr_dbm;
++    AP_Float _spacing_m;
++    AP_Float _min_leg_m;
++    AP_Float _stale_s;
++    AP_Float _leg_deg;
++    AP_Float _past_deg;
++    AP_Float _stop_db;
++    AP_Int8  _type;
++
++    // latest reading and its smoothed level
++    float    _smooth_dbm = -1000;
++    uint32_t _last_rf_ms = 0;
++    bool     _have_rf = false;
++
++    // track distance since the last sweep
++    Location _last_pos;
++    bool     _have_last_pos;
++    float    _dist_since_m;
++
++    // sweep state
++    State    _state;
++    uint16_t _sweeps = 0;
++    float    _course_deg = 0;       // leg course at the start of the sweep
++    float    _phase_turn_deg = 0;   // turned so far in this phase, positive in the phase direction
++    float    _phase_angle_deg = 0;  // how far the RETURN turn goes
++    float    _off_deg = 0;          // heading relative to the course, positive right, not wrapped
++    bool     _extending = false;    // this leg is past RFS_LEG_DEG, following a rising signal
++    bool     _engaged = false;      // the last sweep peaked over RFS_THR_DBM less RFS_STOP_DB: sweep on regardless
++    float    _sweep_peak_dbm = -1000;   // strongest smoothed reading of this sweep, all phases
++    bool     _circle = false;       // RFS_TYPE circle: this sweep is one leg all the way round
++    int8_t   _dir = 1;              // -1 left, +1 right
++    float    _prev_yaw_deg = 0;
++    uint32_t _last_report_ms;
++    uint32_t _start_ms = 0;
++
++    // readings during the legs, for the strongest one and the level at the current heading
++    static const uint16_t MAX_SAMPLES = 200;
++    struct Sample {
++        float yaw_deg;
++        float off_deg;          // _off_deg when taken
++        float dbm;
++    } _samples[MAX_SAMPLES];
++    float    _smoothed[MAX_SAMPLES];   // scratch for find_peak()
++    uint16_t _nsamples;
++    uint16_t _leg_first;            // first sample of the current leg
++    float    _max_dbm = -1000;
++    float    _max_yaw_deg = 0;
++    float    _leg_max_off_deg = 0;  // _off_deg of the current leg's strongest reading
++
++    bool signal_valid() const;
++    void start_sweep(const Location &here, const Location &next_wp);
++    void start_leg(State state);
++    void end_leg(const Location &here, const Location &next_wp, float yaw, const char *why);
++    void end_sweep(const char *why);
++    // smooths the readings over heading (against fading) and finds the strongest, of the sweep and of this leg
++    void find_peak();
++    // the rest of the way round, in the current direction, back onto the leg as it is now from here
++    void circle_back(const Location &here, const Location &next_wp);
++    void report_state();
++    void log_state() const;
++};
+diff --git a/ArduPlane/system.cpp b/ArduPlane/system.cpp
+index dba21a0f9f..a01fcf83db 100644
+--- a/ArduPlane/system.cpp
++++ b/ArduPlane/system.cpp
+@@ -261,6 +261,23 @@ bool Plane::set_mode(Mode &new_mode, const ModeReason reason)
+         return true;
+     }
+ 
++    if (&new_mode == &mode_auto) {
++        // RFSEARCH stays set when code returns to the mode flown before (fence, soaring), but a switch
++        // into AUTO to land (RTL autoland, failsafe to DO_LAND_START) is plain AUTO
++        switch (reason) {
++        case ModeReason::RADIO_FAILSAFE:
++        case ModeReason::GCS_FAILSAFE:
++        case ModeReason::BATTERY_FAILSAFE:
++            mode_auto.set_rf_search(false);
++            break;
++        default:
++            if (mode_reason_is_landing_sequence(reason)) {
++                mode_auto.set_rf_search(false);
++            }
++            break;
++        }
++    }
++
+ #if HAL_QUADPLANE_ENABLED
+     if (new_mode.is_vtol_mode() && !plane.quadplane.available()) {
+         // dont try and switch to a Q mode if quadplane is not enabled and initialized
+@@ -365,6 +382,30 @@ bool Plane::set_mode_by_number(const Mode::Number new_mode_number, const ModeRea
+         notify_no_such_mode(new_mode_number);
+         return false;
+     }
++    if (new_mode == &mode_auto) {
++        // AUTO and RFSEARCH are the same mode object, the number picks which
++        const bool was_rf_search = mode_auto.rf_search_enabled();
++        const bool rf_search = new_mode_number == Mode::Number::RFSEARCH;
++        mode_auto.set_rf_search(rf_search);
++        if (control_mode == &mode_auto) {
++            if (was_rf_search != rf_search) {
++                // switching between the two: no exit/enter, the mission carries on
++                control_mode_reason = reason;
++#if HAL_LOGGING_ENABLED
++                logger.Write_Mode(control_mode->mode_number(), control_mode_reason);
++#endif
++                notify_mode(*control_mode);
++                gcs().send_message(MSG_HEARTBEAT);
++                AP_Notify::events.user_mode_change = 1;
++            }
++            return true;
++        }
++        if (!set_mode(mode_auto, reason)) {
++            mode_auto.set_rf_search(was_rf_search);
++            return false;
++        }
++        return true;
++    }
+     return set_mode(*new_mode, reason);
+ }
+ 
+-- 
+2.43.0
+

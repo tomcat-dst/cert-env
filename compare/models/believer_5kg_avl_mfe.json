@@ -1,0 +1,109 @@
+# believer_5kg_avl.json with MIXING_GAIN 1 (MakeFlyEasy stock) instead of 0.5: ruddervator
+# authority per axis 25 deg instead of 12.5, so the elevator and rudder derivatives are doubled:
+# c_lift_deltae -0.1817 -> -0.3634, c_m_deltae 0.3438 -> 0.6876, c_y_deltar -0.0667 -> -0.1334, c_l_deltar -0.014 -> -0.028, c_n_deltar 0.02 -> 0.04.
+# Mixer saturation (full pitch and yaw together) is not modelled. Used with sim/params/believer_mfe.parm.
+#
+# MFE Believer 1960, ORIGINAL 5.0 kg design: AVL-derived aerodynamics.
+# Same as believer_5kg.json (mass, inertia, drag, propulsion, launcher) except the stability and
+# control derivatives, which come from aero/avl/believer_avl.py (AVL 3.40 vortex lattice with an
+# ESTIMATED V-tail, control surfaces and CG: see that script's header for every assumption).
+# Controls are per unit servo throw: ailerons +-20 deg, ruddervators +-25 deg x MIXING_GAIN 0.5.
+# CG 10% MAC ahead of the AVL neutral point; CGOffset 0 (moments are about the CG). alpha_stall
+# re-solved to keep the previous model's CLmax (1.15) with the new lift slope.
+# Changed from believer_5kg.json: CGOffset, c, c_l_b, c_l_deltaa, c_l_deltar, c_l_p, c_l_r, c_lift_0, c_lift_a, c_lift_deltae, c_lift_q, c_m_0, c_m_a, c_m_deltae, c_m_q, c_n_b, c_n_deltaa, c_n_deltar, c_n_p, c_n_r, c_y_b, c_y_deltaa, c_y_deltar, c_y_p, c_y_r, alpha_stall.
+#
+# Header of believer_5kg.json:
+# MFE Believer 1960, ORIGINAL 5.0 kg design (1.96 m wing, 6S4P, no Starlink); kept for comparison.
+# Current design: believer.json.
+# Needs the local SIM_Plane patch (patches/ardupilot-sitl-plane-electric-propulsion.patch):
+# "mass", "inertia" and the motor/propeller/battery keys below do not exist upstream.
+#
+# Airframe: real geometry and mass.
+#   s 0.514 m^2, b 1.96 m (published), c 0.262 m (s / b), AR 7.47, mass 5.0 kg (design point)
+#   inertia [0.34, 0.20, 0.55] kg m^2: estimate from wing, motor and fuselage masses, not measured.
+# Lift:  c_lift_a 4.957 /rad = 2*pi*AR/(AR+2); c_lift_0 0.25 (assumed incidence);
+#        alpha_stall 0.25 gives CLmax 1.15 in SITL's blended model, a clean stall of about
+#        11.6 m/s at 5 kg. Assumption: the seller's 10 m/s at 4.2 kg (CLmax 1.31) is with flaps.
+# Drag:  oswald 0.8 (assumed), c_drag_p 0.0327, chosen so drag at 20 m/s and 3.78 kg is 4.70 N:
+#        the forum Believer flight (168 W, ~20 m/s) at an assumed 56% efficiency.
+# Propulsion: 2x SunnySky X3120 585KV (43.5 mOhm listed, 1.0 A no-load assumed), ESC 95%,
+#        APC 11x7E with Ct and Cp fitted as quadratics in J to APC's PER3_11x7E.dat
+#        (static row and the 20 m/s rows at 6000-12000 rpm; max fit error 0.0012 / 0.0002).
+#        Battery 6S4P P50B: SIM_BATT_VOLTAGE 25.2, SIM_BATT_CAP_AH 20, 25 mOhm pack + wiring.
+# Launch: rubber catapult, 3.3 g over a ~3.8 m stroke (~15 m/s on a rail): launch_accel 32.4 m/s^2 for
+#        launch_time 0.48 s along body x (IMU 3.4 g peak). Was 59 m/s^2 for 0.39 s, which logged 6.3 g:
+#        too rough for the EPO airframe (compare/launch.md). Fired by servo 7 > 1700. SITL launches level
+#        along the ground with belly friction, not from an inclined rail. The launch keys need the local patch.
+# Stability and control derivatives are SITL's defaults (skywalker_2013), unchanged.
+
+{
+    "mass": 5.0,
+    "inertia": [
+        0.34,
+        0.2,
+        0.55
+    ],
+    "s": 0.514,
+    "b": 1.96,
+    "c": 0.2641,
+    "c_lift_0": 0.2265,
+    "c_lift_deltae": -0.3634,
+    "c_lift_a": 6.0057,
+    "c_lift_q": 9.3975,
+    "mcoeff": 50,
+    "oswald": 0.8,
+    "alpha_stall": 0.2186,
+    "c_drag_q": 0,
+    "c_drag_deltae": 0.0,
+    "c_drag_p": 0.0327,
+    "c_y_0": 0,
+    "c_y_b": -0.252,
+    "c_y_p": -0.0291,
+    "c_y_r": 0.1034,
+    "c_y_deltaa": 0.0048,
+    "c_y_deltar": -0.1334,
+    "c_l_0": 0,
+    "c_l_p": -0.5013,
+    "c_l_b": -0.1071,
+    "c_l_r": 0.1122,
+    "c_l_deltaa": 0.1089,
+    "c_l_deltar": -0.028,
+    "c_m_0": 0.0181,
+    "c_m_a": -0.5987,
+    "c_m_q": -8.5003,
+    "c_m_deltae": 0.6876,
+    "c_n_0": 0,
+    "c_n_b": 0.0304,
+    "c_n_p": -0.0323,
+    "c_n_r": -0.0431,
+    "c_n_deltaa": 0.0008,
+    "c_n_deltar": 0.04,
+    "deltaa_max": 0.3491,
+    "deltae_max": 0.3491,
+    "deltar_max": 0.3491,
+    "CGOffset": [
+        0,
+        0,
+        0
+    ],
+    "num_motors": 2,
+    "motor_kv": 585,
+    "motor_R": 0.0435,
+    "motor_I0": 1.0,
+    "esc_eff": 0.95,
+    "prop_diameter": 0.2794,
+    "prop_ct": [
+        0.11348,
+        -0.04511,
+        -0.13572
+    ],
+    "prop_cp": [
+        0.04281,
+        0.05269,
+        -0.12222
+    ],
+    "prop_J_max": 0.85,
+    "batt_R": 0.025,
+    "launch_accel": 32.4,
+    "launch_time": 0.48
+}

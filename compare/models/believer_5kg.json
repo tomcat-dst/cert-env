@@ -1,0 +1,78 @@
+# MFE Believer 1960, ORIGINAL 5.0 kg design (1.96 m wing, 6S4P, no Starlink); kept for comparison.
+# Current design: believer.json.
+# Needs the local SIM_Plane patch (patches/ardupilot-sitl-plane-electric-propulsion.patch):
+# "mass", "inertia" and the motor/propeller/battery keys below do not exist upstream.
+#
+# Airframe: real geometry and mass.
+#   s 0.514 m^2, b 1.96 m (published), c 0.262 m (s / b), AR 7.47, mass 5.0 kg (design point)
+#   inertia [0.34, 0.20, 0.55] kg m^2: estimate from wing, motor and fuselage masses, not measured.
+# Lift:  c_lift_a 4.957 /rad = 2*pi*AR/(AR+2); c_lift_0 0.25 (assumed incidence);
+#        alpha_stall 0.25 gives CLmax 1.15 in SITL's blended model, a clean stall of about
+#        11.6 m/s at 5 kg. Assumption: the seller's 10 m/s at 4.2 kg (CLmax 1.31) is with flaps.
+# Drag:  oswald 0.8 (assumed), c_drag_p 0.0327, chosen so drag at 20 m/s and 3.78 kg is 4.70 N:
+#        the forum Believer flight (168 W, ~20 m/s) at an assumed 56% efficiency.
+# Propulsion: 2x SunnySky X3120 585KV (43.5 mOhm listed, 1.0 A no-load assumed), ESC 95%,
+#        APC 11x7E with Ct and Cp fitted as quadratics in J to APC's PER3_11x7E.dat
+#        (static row and the 20 m/s rows at 6000-12000 rpm; max fit error 0.0012 / 0.0002).
+#        Battery 6S4P P50B: SIM_BATT_VOLTAGE 25.2, SIM_BATT_CAP_AH 20, 25 mOhm pack + wiring.
+# Launch: rubber catapult, 3.3 g over a ~3.8 m stroke (~15 m/s on a rail): launch_accel 32.4 m/s^2 for
+#        launch_time 0.48 s along body x (IMU 3.4 g peak). Was 59 m/s^2 for 0.39 s, which logged 6.3 g:
+#        too rough for the EPO airframe (compare/launch.md). Fired by servo 7 > 1700. SITL launches level
+#        along the ground with belly friction, not from an inclined rail. The launch keys need the local patch.
+# Stability and control derivatives are SITL's defaults (skywalker_2013), unchanged.
+
+{
+    "mass": 5.0,
+    "inertia": [0.34, 0.20, 0.55],
+    "s": 0.514,
+    "b": 1.96,
+    "c": 0.262,
+    "c_lift_0": 0.25,
+    "c_lift_deltae": 0,
+    "c_lift_a": 4.957,
+    "c_lift_q": 0,
+    "mcoeff": 50,
+    "oswald": 0.8,
+    "alpha_stall": 0.25,
+    "c_drag_q": 0,
+    "c_drag_deltae": 0.0,
+    "c_drag_p": 0.0327,
+    "c_y_0": 0,
+    "c_y_b": -0.98,
+    "c_y_p": 0,
+    "c_y_r": 0,
+    "c_y_deltaa": 0,
+    "c_y_deltar": -0.2,
+    "c_l_0": 0,
+    "c_l_p": -1.0,
+    "c_l_b": -0.12,
+    "c_l_r": 0.14,
+    "c_l_deltaa": 0.25,
+    "c_l_deltar": -0.037,
+    "c_m_0": 0.045,
+    "c_m_a": -0.7,
+    "c_m_q": -20,
+    "c_m_deltae": 1.0,
+    "c_n_0": 0,
+    "c_n_b": 0.25,
+    "c_n_p": 0.022,
+    "c_n_r": -1,
+    "c_n_deltaa": 0.00,
+    "c_n_deltar": 0.1,
+    "deltaa_max": 0.3491,
+    "deltae_max": 0.3491,
+    "deltar_max": 0.3491,
+    "CGOffset": [-0.15, 0.0, -0.05],
+    "num_motors": 2,
+    "motor_kv": 585,
+    "motor_R": 0.0435,
+    "motor_I0": 1.0,
+    "esc_eff": 0.95,
+    "prop_diameter": 0.2794,
+    "prop_ct": [0.11348, -0.04511, -0.13572],
+    "prop_cp": [0.04281, 0.05269, -0.12222],
+    "prop_J_max": 0.85,
+    "batt_R": 0.025,
+    "launch_accel": 32.4,
+    "launch_time": 0.48
+}

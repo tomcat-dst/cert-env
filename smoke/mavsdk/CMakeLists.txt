@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.16)
+project(mavsdk_smoke CXX)
+set(CMAKE_CXX_STANDARD 17)
+find_package(MAVSDK REQUIRED)
+add_executable(mavsdk_smoke main.cpp)
+target_link_libraries(mavsdk_smoke MAVSDK::mavsdk)

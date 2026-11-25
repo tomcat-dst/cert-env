@@ -1,0 +1,3 @@
+/home/tomcat/cert-env/smoke/mavsdk/build/CMakeFiles/mavsdk_smoke.dir
+/home/tomcat/cert-env/smoke/mavsdk/build/CMakeFiles/edit_cache.dir
+/home/tomcat/cert-env/smoke/mavsdk/build/CMakeFiles/rebuild_cache.dir

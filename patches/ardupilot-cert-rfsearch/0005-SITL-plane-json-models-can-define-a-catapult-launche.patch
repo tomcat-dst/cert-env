@@ -1,0 +1,58 @@
+From adcd8deec0e8fc0074c03b7f4cddb2b8435cb536 Mon Sep 17 00:00:00 2001
+From: Vlad Syan <vlad.syan@gmail.com>
+Date: Wed, 25 Nov 2026 10:54:24 +0200
+Subject: [PATCH 5/6] SITL: plane json models can define a catapult launcher
+
+launch_accel (m/s^2 along body x) and launch_time (s) in the model json
+enable the same launcher the -catapult frame has (servo 7 > 1700), so a
+json model can be launched without changing its frame string.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ libraries/SITL/SIM_Plane.cpp | 8 ++++++++
+ libraries/SITL/SIM_Plane.h   | 3 +++
+ 2 files changed, 11 insertions(+)
+
+diff --git a/libraries/SITL/SIM_Plane.cpp b/libraries/SITL/SIM_Plane.cpp
+index 3513344a43..509a292256 100644
+--- a/libraries/SITL/SIM_Plane.cpp
++++ b/libraries/SITL/SIM_Plane.cpp
+@@ -120,6 +120,12 @@ Plane::Plane(const char *frame_str) :
+         mass = coefficient.mass;
+         thrust_scale = (mass * GRAVITY_MSS) / hover_throttle;
+     }
++
++    if (is_positive(coefficient.launch_accel) && is_positive(coefficient.launch_time)) {
++        have_launcher = true;
++        launch_accel = coefficient.launch_accel;
++        launch_time = coefficient.launch_time;
++    }
+ }
+ 
+ void Plane::load_coeffs(const char *model_json)
+@@ -206,6 +212,8 @@ void Plane::load_coeffs(const char *model_json)
+         { "prop_cp", &coefficient.prop_cp, VarType::VECTOR3F },
+         COFF_FLOAT(prop_J_max),
+         COFF_FLOAT(batt_R),
++        COFF_FLOAT(launch_accel),
++        COFF_FLOAT(launch_time),
+     };
+ 
+     for (uint8_t i=0; i<ARRAY_SIZE(vars); i++) {
+diff --git a/libraries/SITL/SIM_Plane.h b/libraries/SITL/SIM_Plane.h
+index 3910cd62de..181ede799a 100644
+--- a/libraries/SITL/SIM_Plane.h
++++ b/libraries/SITL/SIM_Plane.h
+@@ -103,6 +103,9 @@ protected:
+         Vector3f prop_cp{0, 0, 0};      // power coefficient: cp0 + cp1*J + cp2*J^2
+         float prop_J_max = 1.0;         // advance ratio clamp for the polynomials
+         float batt_R = 0;               // battery plus wiring resistance, ohm
++        // optional launcher (catapult) triggered by servo 7 > 1700, like the -catapult frame
++        float launch_accel = 0;         // m/s^2 along body x while the launcher pushes
++        float launch_time = 0;          // s
+     } default_coefficients;
+ 
+     struct Coefficients coefficient;
+-- 
+2.43.0
+

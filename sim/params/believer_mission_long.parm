@@ -1,0 +1,5 @@
+# Long mission (sim/missions/tsuniv_search_long.plan): layered after believer_mission.parm.
+# Search at 900 m above home, so the ceiling goes up to 1000 m: the top of FENCE_ALT_MAX's documented
+# range (10-1000; QGC enforces it). The 2026-11-23 long flight ran with 1200, which the firmware
+# accepted. The 35 km circle (~11 km beyond the farthest waypoint at 23.6 km) comes with the plan.
+FENCE_ALT_MAX    1000

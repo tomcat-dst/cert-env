@@ -1,0 +1,56 @@
+# MakeFlyEasy stock Believer flight-control parameters (Believer_V4.6.3.param, "MFE-2026-1-30",
+# copy in sim/params/reference/), loaded AFTER believer.parm or believer_5kg.parm.
+# Taken: controller gains, limits, airspeeds, TECS speed weight, loop rate, radii.
+# Changed: AIRSPEED_CRUISE 1900 -> 19 (the file kept the old TRIM_ARSPD_CM value in cm/s; the
+#   parameter is m/s since 4.6). 19 also lowers our cruise from 20, as asked.
+# Left out: SERVO1-6_FUNCTION (V-tail 79/80, second aileron and motor; SITL's plane takes separate
+#   elevator/rudder channels), FLTMODE*, BATT_CAPACITY 22000 (our packs are 20/25 Ah), AHRS/EK3 and
+#   ARMING (same as ours). MIXING_GAIN 1 is kept for the record but drives no servo here: the AVL
+#   *_mfe models carry it as 25 deg of ruddervator per axis instead of 12.5.
+# Caution: AIRSPEED_MIN 12 is ~1.03x the 5.0 kg model's stall (11.6 m/s) and ~1.07x the 5.9 kg
+#   model's (11.2 m/s); MFE's value suits the 4.2 kg recommended takeoff weight.
+
+RLL_RATE_D       0
+RLL_RATE_FF      0.5706093
+RLL_RATE_FLTD    12
+RLL_RATE_FLTE    0
+RLL_RATE_FLTT    3
+RLL_RATE_I       0.02416181
+RLL_RATE_IMAX    0.6666667
+RLL_RATE_P       0.1162964
+RLL_RATE_SMAX    150
+RLL2SRV_RMAX     75
+RLL2SRV_TCONST   0.45
+PTCH_RATE_D      0
+PTCH_RATE_FF     0.5171807
+PTCH_RATE_FLTD   12
+PTCH_RATE_FLTE   0
+PTCH_RATE_FLTT   3
+PTCH_RATE_I      0.05415507
+PTCH_RATE_IMAX   0.6666667
+PTCH_RATE_P      0.1083102
+PTCH_RATE_SMAX   150
+PTCH2SRV_RLL     1.05
+PTCH2SRV_RMAX_DN 75
+PTCH2SRV_RMAX_UP 75
+PTCH2SRV_TCONST  0.45
+YAW_RATE_ENABLE  0
+YAW2SRV_DAMP     0.13
+YAW2SRV_IMAX     2000
+YAW2SRV_INT      0.085
+YAW2SRV_RLL      1.2
+YAW2SRV_SLIP     0
+
+PTCH_LIM_MAX_DEG 15
+PTCH_LIM_MIN_DEG -25
+ROLL_LIMIT_DEG   30
+RTL_ALTITUDE     -1
+AIRSPEED_MAX     25
+AIRSPEED_MIN     12
+AIRSPEED_CRUISE  19
+WP_LOITER_RAD    120
+WP_RADIUS        120
+RTL_RADIUS       150
+SCHED_LOOP_RATE  100
+MIXING_GAIN      1
+TECS_SPDWEIGHT   0.8

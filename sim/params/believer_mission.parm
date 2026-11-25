@@ -1,0 +1,20 @@
+# Mission-flight additions for the Tsuniv jammer search (sim/missions/tsuniv_search.plan).
+# Layered after the model's other parameter files by compare/mission.py.
+#
+# Geofence: inclusion circle (uploaded with the plan from QGC) plus a ceiling. FENCE_TYPE bits:
+# 1 = max altitude, 4 = polygons and circles from the uploaded fence. Breach -> RTL.
+FENCE_ENABLE     1
+FENCE_TYPE       5
+FENCE_ACTION     1
+FENCE_ALT_MAX    450    # m above home; the plan tops out at 350 m
+# RC loss must not end the mission beyond RC range (also in believer_5kg.parm; repeated here so the
+# mission's intent is in one place). Defaults kept: FS_SHORT_TIMEOUT 1.5 s, FS_LONG_TIMEOUT 5 s,
+# THR_FAILSAFE 1 (RC loss detected from missing pulses).
+FS_SHORT_ACTN    0
+FS_LONG_ACTN     0
+# Battery: at BATT_LOW_MAH (2000 mAh left, 10%) go home; with RTL_AUTOLAND below that means landing
+# via the mission's DO_LAND_START. Without this the low-battery level only warns.
+BATT_FS_LOW_ACT  1
+# The mission ends in a landing sequence (DO_LAND_START ... NAV_LAND, runway 28). Any RTL (fence
+# breach, battery) flies home and then joins that sequence instead of circling.
+RTL_AUTOLAND     1

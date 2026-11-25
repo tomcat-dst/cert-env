@@ -1,0 +1,32 @@
+# MFE Believer 1960 design parameters, loaded after Tools/autotest/models/plane.parm.
+# Speeds: 20 m/s cruise (seller's recommended speed); minimum 14 m/s is about 1.2x the
+# model's clean stall at 5 kg (~11.6 m/s); maximum 28 m/s.
+AIRSPEED_CRUISE 20
+AIRSPEED_MIN    14
+AIRSPEED_MAX    28
+# Cruise throttle estimated for the real aircraft (X3120 585KV + APC 11x7 on 22.2 V).
+# SITL's linear thrust needs far less, so expect the log to show the difference.
+TRIM_THROTTLE   53
+# Failsafes as designed: losing RC or GCS in AUTO keeps flying the mission.
+ARMING_CHECK    1
+FS_SHORT_ACTN   0
+FS_LONG_ACTN    0
+# 6S4P Molicel P50B, 20 Ah. Simulated by the patched SITL plane (motor + prop + battery).
+BATT_CAPACITY   20000
+BATT_LOW_MAH    2000
+SIM_BATT_VOLTAGE 25.2
+SIM_BATT_CAP_AH 20
+
+# Rubber-catapult launch (TAKEOFF/AUTO), 3.3 g over ~3.8 m (~15 m/s): the motor starts 0.2 s after the launch
+# is detected, full throttle for 5 s (87-89 A for ~4 s), then TECS. Dropping the take-off cap to 75 % after the
+# boost needs a Lua script; without it TECS may use up to ~88 % until TKOFF_ALT (SITL runs emulate the script
+# with endurance.py --param-at). Pitch held at 5 deg to 15 m/s, then <= 8 deg until cruise ground speed:
+# 0 of 12 SITL ground contacts with the hold, 2 of 19 at the 15 deg TECS target (compare/launch.md).
+TKOFF_THR_MINACC 15    # launch detected at >= 15 m/s^2 forward acceleration
+TKOFF_THR_DELAY 2      # then 0.2 s before the motor starts (0.1 s steps)
+TKOFF_OPTIONS 1        # bit 0: TECS throttle between THR_MIN and TKOFF_THR_MAX (needs airspeed)
+TKOFF_THR_MAX 100      # full throttle at launch ...
+TKOFF_THR_MAX_T 5      # ... forced for 5 s from motor start
+TKOFF_ROTATE_SPD 15    # hold TKOFF_GND_PITCH until 15 m/s airspeed (~1.3x stall) ...
+TKOFF_GND_PITCH 5      # ... then ramp to TKOFF_LVL_PITCH until ground speed reaches AIRSPEED_CRUISE
+TKOFF_LVL_PITCH 8      # (with an airspeed sensor this alone is only TECS's minimum pitch)

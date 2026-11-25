@@ -1,0 +1,25 @@
+# MFE Believer 1960 design parameters, loaded after Tools/autotest/models/plane.parm.
+# Speeds: 20 m/s cruise (seller's recommended speed); minimum 14 m/s is about 1.2x the
+# model's clean stall at 5 kg (~11.6 m/s); maximum 28 m/s.
+AIRSPEED_CRUISE 20
+AIRSPEED_MIN    14
+AIRSPEED_MAX    28
+# Cruise throttle estimated for the real aircraft (X3120 585KV + APC 11x7 on 22.2 V).
+# SITL's linear thrust needs far less, so expect the log to show the difference.
+TRIM_THROTTLE   53
+# Failsafes as designed: losing RC or GCS in AUTO keeps flying the mission.
+ARMING_CHECK    1
+FS_SHORT_ACTN   0
+FS_LONG_ACTN    0
+# 6S4P Molicel P50B, 20 Ah. Simulated by the patched SITL plane (motor + prop + battery).
+BATT_CAPACITY   20000
+BATT_LOW_MAH    2000
+SIM_BATT_VOLTAGE 25.2
+SIM_BATT_CAP_AH 20
+
+# Rubber-catapult launch (TAKEOFF/AUTO). The launcher gives ~18 m/s, so no full-throttle run:
+# the motor starts 0.5 s after the launch is detected and TECS manages throttle up to 75%.
+TKOFF_THR_MINACC 15    # launch detected at >= 15 m/s^2 forward acceleration
+TKOFF_THR_DELAY 5      # then 0.5 s before the motor starts (clear of the rubber and rail)
+TKOFF_OPTIONS 1        # bit 0: TECS throttle between THR_MIN and TKOFF_THR_MAX (needs airspeed)
+TKOFF_THR_MAX 75       # takeoff throttle cap, %; starting value, not tuned

@@ -1,0 +1,50 @@
+# ILLUSTRATIVE variant for the comparison harness, not a real aircraft.
+# Starts from SITL's built-in plane (identical to skywalker_2013.json) and changes
+# only the wing geometry and parasitic drag, to give a longer, lower-drag wing:
+#   b  1.88 -> 3.00 m     span
+#   s  0.45 -> 0.60 m^2   area    (aspect ratio b^2/s: 7.9 -> 15.0)
+#   c  0.24 -> 0.20 m     chord   (s / b)
+#   c_drag_p 0.10 -> 0.05 parasitic drag
+# Every other coefficient is unchanged, so differences in the results come from these four.
+
+{
+    "s": 0.60,
+    "b": 3.00,
+    "c": 0.20,
+    "c_lift_0": 0.56,
+    "c_lift_deltae": 0,
+    "c_lift_a": 6.9,
+    "c_lift_q": 0,
+    "mcoeff": 50,
+    "oswald": 0.9,
+    "alpha_stall": 0.4712,
+    "c_drag_q": 0,
+    "c_drag_deltae": 0.0,
+    "c_drag_p": 0.05,
+    "c_y_0": 0,
+    "c_y_b": -0.98,
+    "c_y_p": 0,
+    "c_y_r": 0,
+    "c_y_deltaa": 0,
+    "c_y_deltar": -0.2,
+    "c_l_0": 0,
+    "c_l_p": -1.0,
+    "c_l_b": -0.12,
+    "c_l_r": 0.14,
+    "c_l_deltaa": 0.25,
+    "c_l_deltar": -0.037,
+    "c_m_0": 0.045,
+    "c_m_a": -0.7,
+    "c_m_q": -20,
+    "c_m_deltae": 1.0,
+    "c_n_0": 0,
+    "c_n_b": 0.25,
+    "c_n_p": 0.022,
+    "c_n_r": -1,
+    "c_n_deltaa": 0.00,
+    "c_n_deltar": 0.1,
+    "deltaa_max": 0.3491,
+    "deltae_max": 0.3491,
+    "deltar_max": 0.3491,
+    "CGOffset": [-0.15, 0.0, -0.05]
+}

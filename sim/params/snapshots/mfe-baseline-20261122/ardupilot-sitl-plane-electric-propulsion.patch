@@ -1,0 +1,246 @@
+ArduPilot SITL plane: optional mass, inertia and electric propulsion from the json model.
+
+Local cert-env change (not upstream), applied to ArduPilot d9c5097. Upstream SIM_Plane fixes
+mass at 2 kg, uses torque directly as angular acceleration, makes thrust linear in throttle
+(full throttle = weight / 0.7, independent of airspeed) and models battery current as
+50 A * throttle^2. With this patch a model json may add:
+  mass, inertia[3]                          replace the 2 kg / unit-inertia defaults
+  num_motors, motor_kv, motor_R, motor_I0,  DC motor per motor
+  esc_eff, prop_diameter, prop_ct[3],       propeller Ct/Cp as quadratics in advance ratio J
+  prop_cp[3], prop_J_max, batt_R            SITL battery (SoC + sag) supplies the bus voltage
+  launch_accel, launch_time                 launcher (catapult) push, like the -catapult frame
+                                            suffix but with the model's own push and duration
+Models without these keys behave exactly as before.
+Also backports the upstream master fix for the SITL pitot (AP_HAL_SITL/sitl_airspeed.cpp): 4.7.3
+divides the already-equivalent pitot airspeed by EAS2TAS a second time, so the simulated sensor
+under-reads by that factor (~2.8% at 590 m AMSL) and the aircraft flies faster than commanded.
+
+Apply:   git -C src/ardupilot apply ../../patches/ardupilot-sitl-plane-electric-propulsion.patch
+Build:   (cd src/ardupilot && ./waf plane)
+
+diff --git a/libraries/AP_HAL_SITL/sitl_airspeed.cpp b/libraries/AP_HAL_SITL/sitl_airspeed.cpp
+index cf3e666aa1..aa5d0ab978 100644
+--- a/libraries/AP_HAL_SITL/sitl_airspeed.cpp
++++ b/libraries/AP_HAL_SITL/sitl_airspeed.cpp
+@@ -25,13 +25,13 @@ using namespace HALSITL;
+ #define PASCAL_TO_VOLTS(_p) (_p/VOLTS_TO_PASCAL)
+ 
+ /*
+-  convert airspeed in m/s to an airspeed sensor value
++  convert equivalent airspeed (EAS) in m/s to an airspeed sensor value
+  */
+-void SITL_State::_update_airspeed(float true_airspeed)
++void SITL_State::_update_airspeed(float eas)
+ {
+     for (uint8_t i=0; i<AIRSPEED_MAX_SENSORS; i++) {
+         const auto &arspd = _sitl->airspeed[i];
+-        float airspeed = true_airspeed / AP_Baro::get_EAS2TAS_for_alt_amsl(_sitl->state.altitude);
++        float airspeed = eas;
+         const float diff_pressure = sq(airspeed) / arspd.ratio;
+         float airspeed_raw;
+     
+diff --git a/libraries/SITL/SIM_Plane.cpp b/libraries/SITL/SIM_Plane.cpp
+index 6a0322c84a..509a292256 100644
+--- a/libraries/SITL/SIM_Plane.cpp
++++ b/libraries/SITL/SIM_Plane.cpp
+@@ -115,6 +115,17 @@ Plane::Plane(const char *frame_str) :
+         mass = 2.0;
+         coefficient.c_drag_p = 0.05;
+     }
++
++    if (is_positive(coefficient.mass)) {
++        mass = coefficient.mass;
++        thrust_scale = (mass * GRAVITY_MSS) / hover_throttle;
++    }
++
++    if (is_positive(coefficient.launch_accel) && is_positive(coefficient.launch_time)) {
++        have_launcher = true;
++        launch_accel = coefficient.launch_accel;
++        launch_time = coefficient.launch_time;
++    }
+ }
+ 
+ void Plane::load_coeffs(const char *model_json)
+@@ -189,6 +200,20 @@ void Plane::load_coeffs(const char *model_json)
+         COFF_FLOAT(deltae_max),
+         COFF_FLOAT(deltar_max),
+         { "CGOffset", &coefficient.CGOffset, VarType::VECTOR3F },
++        COFF_FLOAT(mass),
++        { "inertia", &coefficient.inertia, VarType::VECTOR3F },
++        COFF_FLOAT(num_motors),
++        COFF_FLOAT(motor_kv),
++        COFF_FLOAT(motor_R),
++        COFF_FLOAT(motor_I0),
++        COFF_FLOAT(esc_eff),
++        COFF_FLOAT(prop_diameter),
++        { "prop_ct", &coefficient.prop_ct, VarType::VECTOR3F },
++        { "prop_cp", &coefficient.prop_cp, VarType::VECTOR3F },
++        COFF_FLOAT(prop_J_max),
++        COFF_FLOAT(batt_R),
++        COFF_FLOAT(launch_accel),
++        COFF_FLOAT(launch_time),
+     };
+ 
+     for (uint8_t i=0; i<ARRAY_SIZE(vars); i++) {
+@@ -395,6 +420,78 @@ Vector3f Plane::getForce(float inputAileron, float inputElevator, float inputRud
+     return Vector3f(ax, ay, az);
+ }
+ 
++/*
++  electric propulsion: ESC -> DC motor (kv, R, I0) -> propeller with thrust and power
++  coefficients as polynomials of advance ratio J. The motor speed is the steady-state
++  balance of motor and propeller torque, found by bisection. The battery is the SITL
++  battery model (state of charge from SIM_BATT_VOLTAGE / SIM_BATT_CAP_AH, sag from batt_R).
++  Returns total thrust in Newtons.
++ */
++float Plane::electric_thrust(float throttle)
++{
++    const auto &k = coefficient;
++
++    const float param_voltage = sitl->batt_voltage;
++    if (!is_equal(last_param_voltage, param_voltage)) {
++        battery.setup(sitl->batt_capacity_ah, k.batt_R, param_voltage);
++        battery.init_voltage(param_voltage);
++        last_param_voltage = param_voltage;
++    }
++    if (!is_equal(battery.get_capacity(), sitl->batt_capacity_ah.get())) {
++        battery.init_capacity(sitl->batt_capacity_ah);
++    }
++
++    const float u = constrain_float(throttle, 0, 1);
++    const float v_motor = u * battery.get_voltage();
++    const float kv_rad = k.motor_kv * M_2PI / 60;    // rad/s per volt
++    const float D = k.prop_diameter;
++    const float v_axial = MAX(velocity_air_bf.x, 0);
++
++    auto coeffs = [&](float omega, float &ct, float &cp) {
++        const float n = omega / M_2PI;
++        float J = is_positive(n) ? v_axial / (n * D) : k.prop_J_max;
++        J = constrain_float(J, 0, k.prop_J_max);
++        ct = k.prop_ct.x + k.prop_ct.y * J + k.prop_ct.z * sq(J);
++        // keep propeller torque positive so the motor/prop balance has one solution
++        cp = MAX(k.prop_cp.x + k.prop_cp.y * J + k.prop_cp.z * sq(J), 0.001);
++    };
++    // motor torque minus propeller torque, decreasing in omega
++    auto torque_excess = [&](float omega) {
++        float ct, cp;
++        coeffs(omega, ct, cp);
++        const float n = omega / M_2PI;
++        const float i_motor = (v_motor - omega / kv_rad) / k.motor_R;
++        return (i_motor - k.motor_I0) / kv_rad - cp * air_density * sq(n) * powf(D, 5) / M_2PI;
++    };
++
++    float omega = 0;
++    if (is_positive(u) && torque_excess(0) > 0) {
++        float lo = 0, hi = v_motor * kv_rad;
++        for (uint8_t i=0; i<40; i++) {
++            const float mid = 0.5 * (lo + hi);
++            if (torque_excess(mid) > 0) {
++                lo = mid;
++            } else {
++                hi = mid;
++            }
++        }
++        omega = lo;
++    }
++
++    float ct, cp;
++    coeffs(omega, ct, cp);
++    const float n = omega / M_2PI;
++    const float i_motor = is_positive(omega) ? MAX((v_motor - omega / kv_rad) / k.motor_R, 0) : 0;
++    const float i_batt = k.num_motors * u * i_motor / k.esc_eff;
++
++    battery.set_current(i_batt);
++    battery_voltage = battery.get_voltage();
++    battery_current = i_batt;
++    prop_rpm = omega * 60 / M_2PI;
++
++    return k.num_motors * ct * air_density * sq(n) * sq(sq(D));
++}
++
+ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel)
+ {
+     float aileron  = filtered_servo_angle(input, 0);
+@@ -455,8 +552,12 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
+     battery_voltage = sitl->batt_voltage - 0.7*throttle;
+     battery_current = (battery_voltage/sitl->batt_voltage)*50.0f*sq(throttle);
+ 
++    const bool electric = is_positive(coefficient.num_motors) && !ice_engine && !reverse_thrust;
+     if (ice_engine) {
+         thrust = icengine.update(input);
++    } else if (electric) {
++        // Newtons, and sets battery_voltage/current
++        thrust = electric_thrust(throttle);
+     }
+ 
+     // calculate angle of attack
+@@ -474,6 +575,11 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
+     
+     Vector3f force = getForce(aileron, elevator, rudder);
+     rot_accel = getTorque(aileron, elevator, rudder, thrust, force);
++    if (coefficient.inertia.x > 0 && coefficient.inertia.y > 0 && coefficient.inertia.z > 0) {
++        rot_accel.x /= coefficient.inertia.x;
++        rot_accel.y /= coefficient.inertia.y;
++        rot_accel.z /= coefficient.inertia.z;
++    }
+ 
+     if (have_launcher) {
+         /*
+@@ -496,10 +602,14 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
+     
+     // simulate engine RPM
+     motor_mask |= (1U<<2);
+-    rpm[2] = thrust * 7000;
+-    
+-    // scale thrust to newtons
+-    thrust *= thrust_scale;
++    if (electric) {
++        rpm[2] = prop_rpm;
++    } else {
++        rpm[2] = thrust * 7000;
++
++        // scale thrust to newtons
++        thrust *= thrust_scale;
++    }
+ 
+     accel_body = Vector3f(thrust, 0, 0) + force;
+     accel_body /= mass;
+diff --git a/libraries/SITL/SIM_Plane.h b/libraries/SITL/SIM_Plane.h
+index 98584f523e..181ede799a 100644
+--- a/libraries/SITL/SIM_Plane.h
++++ b/libraries/SITL/SIM_Plane.h
+@@ -89,6 +89,23 @@ protected:
+         // the X CoG offset should be -0.02, but that makes the plane too tail heavy
+         // in manual flight. Adjusted to -0.15 gives reasonable flight
+         Vector3f CGOffset{-0.15, 0, -0.05};
++        // optional overrides from a json model; zero keeps the built-in behaviour
++        float mass = 0;                 // kg
++        Vector3f inertia{0, 0, 0};      // kg m^2 about body x, y, z
++        // optional electric propulsion: motor + propeller + battery, replacing linear thrust
++        float num_motors = 0;
++        float motor_kv = 0;             // rpm per volt
++        float motor_R = 0;              // winding resistance, ohm
++        float motor_I0 = 0;             // no-load current, A
++        float esc_eff = 1;
++        float prop_diameter = 0;        // m
++        Vector3f prop_ct{0, 0, 0};      // thrust coefficient: ct0 + ct1*J + ct2*J^2
++        Vector3f prop_cp{0, 0, 0};      // power coefficient: cp0 + cp1*J + cp2*J^2
++        float prop_J_max = 1.0;         // advance ratio clamp for the polynomials
++        float batt_R = 0;               // battery plus wiring resistance, ohm
++        // optional launcher (catapult) triggered by servo 7 > 1700, like the -catapult frame
++        float launch_accel = 0;         // m/s^2 along body x while the launcher pushes
++        float launch_time = 0;          // s
+     } default_coefficients;
+ 
+     struct Coefficients coefficient;
+@@ -131,6 +148,10 @@ protected:
+     Vector3f getForce(float inputAileron, float inputElevator, float inputRudder) const;
+     Vector3f getTorque(float inputAileron, float inputElevator, float inputRudder, float inputThrust, const Vector3f &force) const;
+     void calculate_forces(const struct sitl_input &input, Vector3f &rot_accel);
++    float electric_thrust(float throttle);
++
++    float prop_rpm = 0;
++    float last_param_voltage = -1;
+ 
+ private:
+     // json parsing helpers (TODO reduce code duplication)

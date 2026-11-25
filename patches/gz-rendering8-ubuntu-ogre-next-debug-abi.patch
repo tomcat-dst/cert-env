@@ -1,0 +1,32 @@
+diff --git a/ogre2/src/CMakeLists.txt b/ogre2/src/CMakeLists.txt
+index e939e103..b135c6a9 100644
+--- a/ogre2/src/CMakeLists.txt
++++ b/ogre2/src/CMakeLists.txt
+@@ -76,6 +76,12 @@ endif()
+ # https://github.com/OGRECave/ogre-next/blob/003f51a0a90d1cf93fbea3c7302565b07c4f87b0/OgreMain/include/OgrePlatform.h#L350-L372
+ # target_compile_definitions(${ogre2_target} PRIVATE $<$<CONFIG:Debug>:DEBUG=1 _DEBUG=1>)
+ 
++# cert-env: Ubuntu noble's libogre-next 2.3.3 is compiled with OGRE_DEBUG_MODE on,
++# which grows Ogre::Hlms by 64 bytes; without this the plugin fails to load with
++# an undefined HlmsPbs::_changeRenderSystem thunk. Only _DEBUG, not DEBUG: DEBUG
++# would make Ogre2RenderEngine look for "_d"-suffixed plugins Ubuntu doesn't ship.
++target_compile_definitions(${ogre2_target} PRIVATE _DEBUG=1)
++
+ 
+ set (versioned ${CMAKE_SHARED_LIBRARY_PREFIX}${PROJECT_NAME_LOWER}-${engine_name}${CMAKE_SHARED_LIBRARY_SUFFIX})
+ set (unversioned ${CMAKE_SHARED_LIBRARY_PREFIX}${PROJECT_NAME_NO_VERSION_LOWER}-${engine_name}${CMAKE_SHARED_LIBRARY_SUFFIX})
+diff --git a/ogre2/src/terrain/Terra/CMakeLists.txt b/ogre2/src/terrain/Terra/CMakeLists.txt
+index 3da28165..5732279d 100644
+--- a/ogre2/src/terrain/Terra/CMakeLists.txt
++++ b/ogre2/src/terrain/Terra/CMakeLists.txt
+@@ -26,6 +26,10 @@ add_definitions(-DOGRE_IGNORE_UNKNOWN_DEBUG)
+ #target_compile_definitions(${PROJECT_NAME} PUBLIC
+ #  $<$<CONFIG:Debug>:DEBUG=1 _DEBUG=1>)
+ 
++# cert-env: match Ubuntu noble's libogre-next 2.3.3 (built with OGRE_DEBUG_MODE);
++# HlmsTerra derives from HlmsPbs, so it needs the same layout. See ogre2/src/CMakeLists.txt.
++target_compile_definitions(${PROJECT_NAME} PRIVATE _DEBUG=1)
++
+ target_include_directories(${PROJECT_NAME}
+   PRIVATE
+     # Hlms files inside Hlms/Pbs do not have #include <Hlms/Pbs/...> thus
