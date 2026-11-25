@@ -1,4 +1,0 @@
-source: https://github.com/yunusemretom/toy-px4-sim
-commit: 1115b45dfcbf41504d00e84d172b2099ada93781
-fetched: 2026-11-21
-license: see LICENSE

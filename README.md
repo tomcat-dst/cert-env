@@ -1,94 +1,34 @@
-# cert-env — ArduPilot + Gazebo + QGC + MAVSDK
+# cert-env — ArduPilot SITL + QGC + MAVSDK
 
 Host: Ubuntu 24.04.5 (noble), x86_64, gcc 13.3, cmake 3.28. Built 2026-11-19.
 
 | Component | Version | Location | Status |
 |---|---|---|---|
-| ArduPilot SITL | `Copter-4.7.3` tag | `src/ardupilot/build/sitl/bin/{arducopter,arduplane,ardurover}` | Built, verified |
+| ArduPilot SITL | `Plane-4.7.3` + branch `cert-rfsearch` ([fork](https://github.com/tomcat-dst/ardupilot/tree/cert-rfsearch)) | `src/ardupilot/build/sitl/bin/arduplane` | Built, verified |
 | MAVSDK (C++) | `v4.2.1` | `install/mavsdk` | Built, installed, verified |
-| QGroundControl | `v5.1.5` (Qt 6.11.1 via aqt in `Qt/`) | `src/qgroundcontrol/build/Release/QGroundControl` | Built, verified |
-| Gazebo Harmonic | gz-sim 8.15.0 (gazebodistro `collection-harmonic.yaml`) | `src/gz-harmonic` → `install/gz` | Built (16/16), **1 local patch**, verified |
-| ardupilot_gazebo | `main` | `src/ardupilot_gazebo/build` | Built, verified |
+| QGroundControl | `v5.1.5` (Qt 6.11.1 via aqt in `Qt/`) + branch `rf-scan-overlay` ([fork](https://github.com/tomcat-dst/qgroundcontrol/tree/rf-scan-overlay)) | `src/qgroundcontrol/build/Release/QGroundControl` | Built, verified |
 
 ## Quick start
 
 Run `source ~/cert-env/env.sh` in each terminal first.
 
-Copter (Iris quad):
+The Believer with RFSEARCH and two hidden signal sources, flown from QGC:
 
 ```bash
-gz sim -v4 -r iris_runway.sdf                                    # terminal 1 (GUI)
-sim_vehicle.py -v ArduCopter -f gazebo-iris --model JSON --map --console   # terminal 2
-$QGC_BIN                                                          # terminal 3 (auto-connects on UDP 14550)
-```
-
-Fixed wing (Zephyr flying wing):
-
-```bash
-gz sim -v4 -r zephyr_runway.sdf                                  # terminal 1 (GUI)
-sim_vehicle.py -v ArduPlane -f gazebo-zephyr --model JSON --map --console  # terminal 2
-$QGC_BIN                                                          # terminal 3
-```
-
-Then in the MAVProxy prompt: `mode fbwa`, `arm throttle`, `rc 3 1800`, and once it's climbing, `mode circle`.
-
-**Auto takeoff (TAKEOFF mode / AUTO mission `NAV_TAKEOFF`) needs one parameter first:**
-
-```
-param set FLIGHT_OPTIONS 4
-mode takeoff
-arm throttle
-```
-
-The stock world spawns the Zephyr standing on its tail (pitch about 88°). ArduPlane's takeoff attitude check refuses to launch above 45° pitch and reports `Bad launch AUTO`. `FLIGHT_OPTIONS` bit 2 (value 4) disables that check (OR it in if you use other bits).
-Verified: TAKEOFF climbed to 45 m of 50 (`smoke/run_gz_e2e.sh plane-takeoff`).
-
-`worlds/zephyr_runway_15deg.sdf` spawns it 15° nose-up instead, which does pass the attitude check. **But the aircraft can't take off from it:** with no landing gear it tips onto its nose (settles at pitch −17°, roll −11°), and TAKEOFF mode stayed at 0 m (`smoke/run_gz_e2e.sh plane-takeoff-15`).
-A 15° launch would need something holding the airframe at that angle, such as a launch rail or ramp in the world, and probably a launch impulse.
-
-Automated end-to-end checks (headless, no windows, clean up after themselves, about 1–3 min each):
-
-```bash
-~/cert-env/smoke/run_gz_e2e.sh copter
+python compare/mission.py --plan sim/missions/tsuniv_rf_two.plan --params sim/params/believer_mission_long.parm --rf --rf-scenario two --rc-fail-km 0 --wait-operator 7200
 ```
 ```bash
-~/cert-env/smoke/run_gz_e2e.sh plane
+$QGC_BIN
 ```
+
+QGC connects on UDP 14550. In QGC: Plan → Open `sim/missions/tsuniv_rf_two.plan` → Upload; Fly → Arm, switch to RFSearch, start the mission. The script releases the catapult once it sees the aircraft armed in AUTO or RFSEARCH. More in [Signal sources](#signal-sources-rf-search-in-sitl) below.
 
 ## What was verified (and how)
 
-- **SITL:** `arducopter` listened on TCP 5760. pymavlink received a HEARTBEAT with type=2 (quad) and autopilot=3 (ArduPilot).
 - **MAVSDK:** `smoke/mavsdk` linked against `install/mavsdk` and connected to SITL. It discovered the autopilot (sysid 1) and read telemetry.
   Position read NaN 3 s after boot. That's likely because the EKF hadn't aligned yet; I didn't check further.
-- **QGC:** `--simple-boot-test` exited 0. A live run (offscreen, sandbox HOME) auto-connected to SITL on UDP 14550 and identified it as ArduPilot quad.
-  It loaded all parameters via MAVLink FTP in about 1.6 s. Log: `logs/qgc-sitl.log`.
+- **QGC:** `--simple-boot-test` exited 0. Our build flew the RFSEARCH missions of 2026-11-23..25 with `arduplane` SITL over UDP 14550: plan and geofence upload, arming, mode change, the bearing map and the `RFS_` parameter descriptions.
   QGC ignored SIGINT/SIGTERM under `QT_QPA_PLATFORM=offscreen` and needed SIGKILL. A normal desktop session shouldn't be affected (not tested).
-- **Gazebo + ArduPilot, closed loop:** `smoke/run_gz_e2e.sh` ran headless gz-server (iris_runway) and ArduCopter SITL with `--model JSON` + `gazebo-iris.parm`.
-  The test waited for EKF3/GPS and prearm, armed in GUIDED and took off. It reached **4.56 m** against a 4.5 m threshold → PASS (re-checked after the runner gained plane support). Log: `logs/gz-test-copter.log`.
-- **Fixed wing, closed loop:** `smoke/run_gz_e2e.sh plane` runs `zephyr_runway.sdf` + `arduplane` with `gazebo-zephyr.parm` only, the same params `sim_vehicle.py -f gazebo-zephyr` loads.
-  The test follows the plugin README procedure over MAVLink: FBWA → arm → throttle 1800 → climb to 40 m → CIRCLE (throttle override released).
-  Result: **400° of turn in CIRCLE, altitude held between 38.1 and 40.2 m, average groundspeed 10.0 m/s (min 9.7)** vs the vehicle's `AIRSPEED_MIN` 9.0 → PASS.
-  Two runs gave identical numbers (lockstep). Log: `logs/gz-test-plane.log`.
-  - **Tuning note:** the margin over `AIRSPEED_MIN` is only about 1 m/s. That's expected for the stock setup, not a fault. `gazebo-zephyr.parm` sets `ARSPD_TYPE 0` (no airspeed sensor), so CIRCLE flies on `TRIM_THROTTLE` (45%) rather than holding `AIRSPEED_CRUISE` (12 m/s).
-    If you want more margin, raise `TRIM_THROTTLE` or enable a simulated airspeed sensor. I haven't tested either.
-- **Fixed wing, full workflow:** under Xvfb, Gazebo zephyr + `sim_vehicle.py -f gazebo-zephyr --map --console` + QGC ran together.
-  MAVProxy loaded console and map and received 1356 params. QGC auto-connected via MAVProxy's UDP 14550 output, identified ArduPilot fixed-wing (type 1) and loaded all params. No errors.
-  Logs: `logs/sim_vehicle-plane.log`, `logs/qgc-plane.log`.
-- **sim_vehicle.py (documented workflow):** ran under Xvfb against gz-server with `--map --console`. MAVProxy loaded the console and map modules, detected vehicle 1:1 and received 1404 params. No tracebacks.
-- **Gazebo GUI:** `gz sim -g` under Xvfb connected to the server, loaded all GUI plugins and rendered via OGRE2 with zero `[Err]` lines.
-  This was **software GL on a virtual display**. It hasn't been tried on your real desktop/GPU.
-- **Plugins:** every `gz-rendering` engine plugin and every `ardupilot_gazebo` plugin passed an `RTLD_NOW` dlopen, so all symbols resolve.
-
-## Local patch: gz-rendering8 vs Ubuntu's ogre-next (important)
-
-`patches/gz-rendering8-ubuntu-ogre-next-debug-abi.patch` is applied automatically by `build-after-deps.sh`.
-
-- **Symptom without it:** `gz sim` segfaults. `libgz-rendering-ogre2.so` fails to load with `undefined symbol: _ZThn944_N4Ogre7HlmsPbs19_changeRenderSystem…`.
-- **Cause (measured):** Ubuntu noble's `libogre-next` 2.3.3 is built with OGRE debug mode, so `Ogre::Hlms` is 864 bytes, not 800.
-  The library exports the thunk at offset 1008, while gz-rendering compiled in release mode expects 944.
-  A probe compiled against the same headers (`smoke/ogre-abi/probe.cpp`) gives 944 by default and 1008 with `_DEBUG` → exact match.
-- **Fix:** `_DEBUG=1` (not `DEBUG`) on the `gz-rendering8-ogre2` and Terra targets only. `DEBUG` would make gz look for `_d`-suffixed OGRE plugins, which Ubuntu doesn't ship.
-  This is upstream's own commented-out workaround in those CMakeLists, made unconditional. No other gz package includes OGRE headers.
 
 ## Changes made to the system / environment
 
@@ -101,9 +41,8 @@ Automated end-to-end checks (headless, no windows, clean up after themselves, ab
 ## Files
 
 - `install-deps.sh`: apt list (already run).
-- `build-after-deps.sh`: rebuild Gazebo + plugin from clean (applies the patch).
-- `env.sh`: source for PATH/libs/plugin paths. Safe to source from scripts that use `set -u`.
-- `smoke/`: test programs. `logs/`: every build and test log.
+- `env.sh`: source for PATH and libraries. Safe to source from scripts that use `set -u`.
+- `smoke/`: test programs. `logs/`: build and test logs.
 
 ## Comparing fixed-wing models (`compare/compare_planes.py`)
 
@@ -117,11 +56,10 @@ source ~/cert-env/env.sh && python compare/compare_planes.py --param AIRSPEED_CR
 ```
 
 - **Timing:** about 40 s wall-clock per model at the default `--speedup 5`. Durations are measured in simulated time, so the speedup doesn't change results.
-- **Output:** `compare/results/<timestamp>/` holds `summary.md` / `summary.csv`, `timeseries.png` and `loiter_tracks.png`. Each model's subfolder has `samples.csv`, `statustext.txt`, the SITL/Gazebo logs and the onboard `logs/*.BIN` (open with `MAVExplorer.py`).
+- **Output:** `compare/results/<timestamp>/` holds `summary.md` / `summary.csv`, `timeseries.png` and `loiter_tracks.png`. Each model's subfolder has `samples.csv`, `statustext.txt`, the SITL log and the onboard `logs/*.BIN` (open with `MAVExplorer.py`).
 - **Parameters:** each model starts with its frame's stock defaults, exactly as `sim_vehicle.py` loads them. Key parameters are listed per model, and ones that differ are flagged. Use `--param` for a controlled, same-settings comparison.
 - **Adding a model:** add an entry to `MODELS` at the top of the script.
   - SITL aircraft file: `model_file=<path to JSON>`, as in `compare/models/plane_high_ar.json`.
-  - Gazebo model: `engine="gazebo"` plus a world name.
   - SITL can't open absolute paths: it strips the leading `/` and resolves them inside its run directory. So the harness copies `model_file` into each run directory. The same applies if you pass your own JSON to `sim_vehicle.py`: put it in the directory you launch from.
 
 Things found while building it (run `20261121-143813`):
@@ -131,51 +69,11 @@ Things found while building it (run `20261121-143813`):
   - glide ratio 3.6 vs 3.1
   - max climb 13.2 vs 10.7 m/s
   - Its loiter hadn't fully converged after the 20 s settle (track still spiralling), so its 107.8 m loiter radius is an average.
-- **SITL's built-in planes fly uncoordinated turns:** the measured loiter radius (~96 m) is well above the radius implied by their bank (~72 m). The Gazebo Zephyr's turn is coordinated (63.9 vs 63.3 m). This is a property of the physics models, so it's another reason not to compare across engines.
-- **Gazebo aircraft are fully defined in their SDF model file.** Mass/inertia, geometry, per-surface aerodynamics (`LiftDrag` or the stability-derivative `AdvancedLiftDrag`, both installed), propeller and control-surface joints, and the servo-to-joint mapping (`ArduPilotPlugin` `<control>` blocks).
-
-## X-UAV Talon (1718 mm) in Gazebo
-
-Third-party model from [yunusemretom/toy-px4-sim](https://github.com/yunusemretom/toy-px4-sim) (MIT, commit `1115b45`, 2026-11-11). It's the only public full-size Talon found; no tuned ArduPilot params exist publicly.
-
-| Where | What |
-|---|---|
-| `ref/talon_xuav_toy-px4-sim/` | Untouched upstream copy: model, meshes, `talon.parm`, the author's `run.sh` and `plane_specs.py` (the geometry it was generated from) |
-| `sim/models/talon_ap`, `sim/models/talon` | Working copy of the model (meshes live in `talon`) |
-| `sim/worlds/talon_runway.sdf` | The Zephyr runway world with the Talon instead (nose down the runway, yaw 93°) |
-| `sim/params/xuav_talon.parm` | The author's ArduPilot params, unchanged |
-
-`env.sh` puts `sim/models` and `sim/worlds` on Gazebo's path. Run it interactively (after `source ~/cert-env/env.sh` in each terminal):
-
-```bash
-gz sim -v4 -r talon_runway.sdf
-sim_vehicle.py -v ArduPlane -f plane --model JSON --add-param-file=$HOME/cert-env/sim/params/xuav_talon.parm --map --console
-```
-
-Verified: SITL loads `plane.parm` then `xuav_talon.parm` (same as the author's launcher) and MAVProxy receives 1419 params. Gazebo loads the model with no errors (ArduPilotPlugin, AdvancedLiftDrag, Thruster and 4 servo controllers).
-In the harness it's `xuav-talon-gz` (`python compare/compare_planes.py --models xuav-talon-gz`).
-
-**What the model is:**
-- Generated from published specs: 1718 mm span, 60 dm² wing, 2.5–3.0 kg (set to 2.8), V-tail, pusher. Geometry details are the author's estimates (chords, NACA 2412 wing, tail sizes); aerodynamics computed with AVL into `AdvancedLiftDrag` coefficients.
-- **Motor:** an idealised `Thruster`. ArduPilot throttle (SERVO5) commands 0–30 N directly; there's no prop or motor model. Change `max_thrust_cmd` and the `multiplier` on `<control channel="4">` together.
-- **Ground contact:** one low-friction box (μ = 0.1), no wheels, so it takes off sliding on its belly.
-- **Params:** simulator setup only. Servo mapping, airspeeds (cruise 15, min 11, max 20 m/s), `TRIM_THROTTLE 34`, `THR_MAX 90`.
-  - No roll/pitch rate gains or TECS settings, so ArduPilot flies it on **default gains**.
-  - It also sets `ARMING_CHECK 0` and turns failsafes off.
-
-**Measured in the harness** (run `20261121-152139`; repeat run within 0.1):
-- takeoff to 108 m in 28.6 s
-- loiter at 15.0 m/s with 10.9% throttle
-- coordinated turns (85.3 m measured vs 85.2 m implied by bank)
-- power-off glide ratio 8.3 at 15 m/s
-
-Cross-check: weight / glide ratio = 2.8 × 9.81 / 8.3 ≈ 3.3 N of drag, versus loiter thrust 10.9% × 30 N ≈ 3.3 N. The aerodynamics and thrust model are consistent with each other.
-
-**First thing to tune:** with 30 N on a 2.8 kg airframe (thrust-to-weight ≈ 1.1), full takeoff throttle gives a ~16 m/s climb and an airspeed overshoot to ~39 m/s, about twice `AIRSPEED_MAX`. A real Talon on its stock power system can't do that. Set `max_thrust_cmd` (and the channel 4 `multiplier`) from your motor/prop's static thrust.
+- **SITL's built-in planes fly uncoordinated turns:** the measured loiter radius (~96 m) is well above the radius implied by their bank (~72 m). This is a property of the physics model.
 
 ## MFE Believer 1960 in SITL (built-in plane physics)
 
-No Believer model exists for Gazebo or SITL (checked ArduPilot/SITL_Models, local sources and
+No Believer model exists for SITL (checked ArduPilot/SITL_Models, local sources and
 the web on 2026-11-22), so `compare/models/believer.json` describes it for SITL's built-in
 plane model. The file header explains every coefficient and its source; the parameters are in
 `sim/params/believer.parm` (20 m/s cruise, 14/28 m/s limits, failsafes that keep AUTO running).
@@ -225,3 +123,86 @@ Remaining limits:
   are SITL's generic defaults, so control-loop behaviour is indicative only.
 - **Battery voltage uses SITL's LiPo state-of-charge curve**, not a Li-ion (P50B) curve.
 - **Motor no-load current (1 A) and the drag polar are assumptions**; see the JSON header.
+
+## Signal sources (RF search in SITL)
+
+SITL has no radio channel, so `compare/rf_companion.py` stands in for the Pi Zero with tinySA. It connects to SITL's
+SERIAL2 and, every 0.2 s of simulated time, works out what the analyzer would read through the nose antenna from
+hidden sources, then sends it to the autopilot as `NAMED_VALUE_FLOAT RF_dBm`. In RFSEARCH (ArduPlane mode 27) the
+autopilot flies a 360° circle when that reading is at or above `RFS_THR_DBM`; the companion turns each circle into
+bearings, crosses them and sends the estimates with error ellipses to QGC. `compare/mission.py --rf` starts it.
+
+**The model.** Each source is an omnidirectional transmitter on the ground (home elevation), all on one frequency, so
+the analyzer sees their sum. Default power 47 dBm EIRP (50 W). Path loss is free space to 100 m, then 30 dB per decade,
+plus 1.5 dB random fading per source and reading and a −110 dBm noise floor. The antenna is a nose helix: 15 dBi,
+30° beam, tilted 10° down; its pointing comes from the aircraft's real roll, pitch and heading. In the 25.11 flights the
+strongest reading of a circle was about −63 to −80 dBm.
+
+**Ready-made layouts** (`SCENARIOS` in `compare/rf_companion.py`; distances from home, Tsuniv):
+
+| Name | Sources | Made for |
+|---|---|---|
+| `single` | 1, 13.8 km out on the launch heading | `tsuniv_rf_search.plan` |
+| `multi` | 3, 17.8–23.2 km out, 3.9–5.4 km apart | `tsuniv_rf_multi.plan`, `tsuniv_rf_sweep.plan` |
+| `multi_b` | 3, 15.5–19.5 km out, 3.9–9.6 km apart | `tsuniv_rf_ellipse.plan` |
+| `sw5` | 5, 20–27.5 km south-west, at least 3.6 km apart | `tsuniv_rf_ellipse_sw.plan` |
+| `sw4` | `sw5` without its middle source, at least 4.7 km apart | `tsuniv_rf_ellipse_sw.plan` |
+| `two` | 2, 16 and 19.5 km north, 5.7 km apart | `tsuniv_rf_two.plan` |
+
+Always pass `--rf-scenario` for an RFSEARCH plan: the default `auto` picks `multi` for any plan without half-loiters.
+
+**Adding your own layout.**
+
+1. Work out the coordinates. North/east offsets from home in km convert like this (it reproduces `two`):
+
+   ```python
+   import math
+   HOME = (49.825888, 23.689912)          # Tsuniv, runway 10/28
+   def at(north_km, east_km):
+       return (HOME[0] + north_km / 111.195,
+               HOME[1] + east_km / (111.195 * math.cos(math.radians(HOME[0]))))
+   print(at(16.0, 2.5), at(19.5, -2.0))
+   ```
+
+2. Add an entry to `SCENARIOS`: a list of `(lat, lon, EIRP in dBm)`, for example
+   `"mine": [(49.9697795, 23.7247633, 47.0), (50.0012557, 23.6620309, 40.0)]`. A lower EIRP makes a source weaker.
+   `--rf-scenario` takes any key of `SCENARIOS`; nothing else needs changing.
+3. Make a route that passes the sources from the side, about 4 km off. RFSEARCH circles only on plain waypoint legs,
+   not closer than `RFS_MIN_LEG` (500 m) to the next waypoint, not on take-off or landing and not in a battery failsafe.
+   Draw it in QGC (plain waypoints, then `DO_LAND_START`, approach waypoints and `NAV_LAND`) and save it in
+   `sim/missions/`, or add it to `sim/missions/make_tsuniv_plan.py` and run that with the plan's name as the argument.
+   Without arguments the script rewrites every plan it knows; `tsuniv_rf_sweep.plan` and `tsuniv_rf_ellipse_sw.plan`
+   are edited in QGC and are not among them.
+
+What worked in the flights so far:
+- **At most four sources.** The estimator tries up to `MAX_SOURCES` = 4; allowing five let a false fifth source in.
+- **Keep sources about 5 km apart.** `sw5`'s middle source overlapped a neighbour from everywhere on the route and was
+  never separated; `sw4` (at least 4.7 km apart) found all four.
+- **Sources in line with a leg merge** until the route sees them from the side: in the four-source QGC flight two such
+  sources ended 335 and 434 m off, one with a 2.4 km ellipse.
+
+**Flying it.** Headless, about 3–4 min wall time at `--speedup 20`, no QGC:
+
+```bash
+python compare/mission.py --plan sim/missions/tsuniv_rf_two.plan --params sim/params/believer_mission_long.parm --rf --rf-scenario two --mode RFSEARCH --upload --speedup 20 --rc-fail-km 0
+```
+
+- `--rc-fail-km 5 --rc-fail-s 0`: RC is cut beyond 5 km and comes back only inside 5 km on the way home; the search goes
+  on without RC (`FS_SHORT_ACTN 0`, `FS_LONG_ACTN 0`).
+- `--rf-seed N`: another draw of the fading. The same seed and the same flight path give the same readings.
+- `--instance N`: several runs at once (ports shift by 10 per instance; the results folder gets `-iN`).
+- With QGC instead: drop `--mode`, `--upload` and `--speedup`, add `--wait-operator 7200`, and start the mission from
+  QGC as in [Quick start](#quick-start).
+
+**Results** go to `compare/results/mission-<time>[-iN]/believer-5kg-avl-at/`:
+- `rf_result.json`: the true sources (`truth`), the estimates (`fixes`, each with `error_m` against its true source and
+  the 1σ ellipse `ellipse_m_deg`: semi-axes in m and orientation) and every bearing.
+- `rf_samples.csv`: every reading with position, attitude and antenna pointing.
+- `rf_companion.log`, `sitl.log` and the flight log `logs/00000001.BIN`.
+
+Our QGC build draws the live reading, the bearings, the estimates `S<n>` with their ellipses and, in SITL, the true
+positions `T<n>` with the distance to the nearest estimate. `rf_companion.py --hide-truth` leaves the true positions
+out; `mission.py` does not pass that option.
+
+Series of flights: `compare/rfsearch/run_batch.sh OUTDIR FIRST_INSTANCE PARM_FILE|- SEED...` flies five fixed layouts per
+seed in parallel, and `compare/rfsearch/summarise.py LOG... > out.json` tabulates their errors.

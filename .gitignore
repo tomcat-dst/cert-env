@@ -1,4 +1,4 @@
-# third-party source trees and toolchains (ArduPilot, QGC, Gazebo, MAVSDK, AVL): see README and patches/
+# third-party source trees and toolchains (ArduPilot, QGC, MAVSDK, AVL): see README and patches/
 /src/
 /install/
 /Qt/
@@ -16,7 +16,6 @@ __pycache__/
 eeprom.bin
 /terrain/
 /sitl-smoke/
-/smoke/gz-run/
 /mav.parm
 
 # deck build intermediates (the scripts are kept; images are rebuilt from them)

@@ -10,7 +10,7 @@ in its own run directory, then flown by this script over MAVLink:
   glide    LOITER with THR_MAX=0, up to 45 s (first 5 s not scored): sink rate, glide ratio
 
 All durations are simulated time (from the autopilot's time_boot_ms), so results
-don't depend on --speedup. Outputs per run: samples.csv, SITL/Gazebo logs and the
+don't depend on --speedup. Outputs per run: samples.csv, the SITL log and the
 DataFlash .BIN; plus summary.csv, summary.md and plots in the results directory.
 
 Usage:
@@ -50,8 +50,7 @@ ARDUPLANE = ARDUPILOT / "build/sitl/bin/arduplane"
 # Altitude matters: the built-in plane's air density follows it. SITL_HOME overrides.
 HOME = os.environ.get("SITL_HOME", "49.825888,23.689912,290,109")
 
-# engine "sitl": SITL's built-in physics. engine "gazebo": Gazebo via the JSON
-# interface. Results across engines are not directly comparable.
+# engine "sitl": SITL's built-in physics (the only engine; the field stays in the summaries).
 MODELS = {
     "plane":        dict(frame="plane", engine="sitl"),
     # Coefficient-for-coefficient identical to "plane" (SITL's defaults come from the
@@ -64,14 +63,6 @@ MODELS = {
     "high-ar":      dict(frame="plane", engine="sitl",
                          model_file=ROOT / "compare/models/plane_high_ar.json"),
     "plane-elevon": dict(frame="plane-elevon", engine="sitl"),
-    "zephyr-gz":    dict(frame="gazebo-zephyr", model="JSON", engine="gazebo",
-                         world="zephyr_runway.sdf"),
-    # X-UAV Talon (1718 mm) from yunusemretom/toy-px4-sim (MIT): AVL-derived AdvancedLiftDrag,
-    # ideal 0-30 N thruster. Params launched as its author does: plane.parm, then its own file.
-    "xuav-talon-gz": dict(frame="plane", model="JSON", engine="gazebo",
-                          world="talon_runway.sdf",
-                          defaults=[AUTOTEST / "models/plane.parm",
-                                    ROOT / "sim/params/xuav_talon.parm"]),
     # MFE Believer 1960, current design (5.9 kg, 2.36 m wing, Starlink, 6S5P), SITL's built-in physics
     # plus the local propulsion patch; see the header of the JSON file.
     "believer":     dict(frame="plane", engine="sitl",
@@ -159,8 +150,8 @@ MODELS = {
                                    ROOT / "sim/params/believer_5kg_avl_autotune.parm"]),
 }
 
-# Applied to every model. FLIGHT_OPTIONS bit 2 skips the takeoff attitude check,
-# which the Zephyr (spawned standing on its tail) otherwise always fails.
+# Applied to every model. FLIGHT_OPTIONS bit 2 skips the takeoff attitude check; every
+# recorded run used it, so it stays.
 # TKOFF_ALT 120 leaves ~100 m for the glide, so it reaches a steady state.
 COMMON_PARAMS = {"FLIGHT_OPTIONS": 4, "TKOFF_ALT": 120}
 
@@ -214,12 +205,6 @@ class Run:
         return p
 
     def start(self):
-        if self.cfg["engine"] == "gazebo":
-            gz = self._spawn(["bash", "-c", f"source '{ROOT}/env.sh'; exec gz sim -s -r "
-                              f"--headless-rendering {self.cfg['world']}"], "gazebo.log")
-            time.sleep(15)
-            if gz.poll() is not None:
-                raise RuntimeError("gazebo server exited during startup")
         model = self.cfg.get("model", self.cfg["frame"])
         if "model_file" in self.cfg:
             src = Path(self.cfg["model_file"])
@@ -229,8 +214,6 @@ class Run:
                "--speedup", str(self.speedup), "-w", f"-I{self.instance}", "--home", HOME,
                "--defaults", ",".join(str(p) for p in self.cfg.get("defaults")
                                       or frame_defaults(self.cfg["frame"]))]
-        if self.cfg["engine"] == "gazebo":
-            cmd += ["--slave", "0", "--sim-address=127.0.0.1"]
         cmd += self.cfg.get("sitl_args", [])    # e.g. ["--serial1", "udpclient:127.0.0.1:14550"]
         self._spawn(cmd, "sitl.log")
         time.sleep(3)
@@ -475,9 +458,8 @@ def write_report(outdir, rows, overrides):
     lines.append("Same flight profile for every model. Parameters forced on all models: "
                  + ", ".join(f"`{k}={v}`" for k, v in {**COMMON_PARAMS, **overrides}.items()) + ".")
     lines.append("Everything else is each frame's stock defaults (see the parameter table).")
-    lines.append("**Only compare models within the same engine.**")
     lines.append("")
-    for engine in ("sitl", "gazebo"):
+    for engine in ("sitl",):
         group = [r for r in rows if r["engine"] == engine]
         if not group:
             continue
@@ -509,7 +491,7 @@ def plot(outdir, rows):
         t0 = next((x["t"] for x in r["samples"] if x["phase"] == "takeoff"), r["samples"][0]["t"])
         # Start just before takeoff: boot-time sensor transients aren't part of the profile.
         s = [x for x in r["samples"] if x["t"] >= t0 - 3.0]
-        style = "--" if r["engine"] == "gazebo" else "-"
+        style = "-"
         label = f'{r["model"]} [{r["engine"]}]'
         ts = [x["t"] - t0 for x in s]
         axes[0].plot(ts, [x["alt_rel"] for x in s], style, label=label)
@@ -532,7 +514,7 @@ def plot(outdir, rows):
             xy = _enu(lo)
             cx, cy, _ = _circle_fit(xy) if len(xy) > 10 else (0.0, 0.0, 0.0)
             ax.plot([x - cx for x, _ in xy], [y - cy for _, y in xy],
-                    "--" if r["engine"] == "gazebo" else "-", label=f'{r["model"]} [{r["engine"]}]')
+                    "-", label=f'{r["model"]} [{r["engine"]}]')
     ax.set_aspect("equal")
     ax.set_xlabel("East (m, centred)")
     ax.set_ylabel("North (m, centred)")
@@ -571,7 +553,7 @@ def main():
         cfg = MODELS[name]
         busy = ports_busy()
         if busy:
-            sys.exit(f"port {busy} is in use (another SITL/Gazebo running?); stop it first")
+            sys.exit(f"port {busy} is in use (another SITL running?); stop it first")
         rundir = outdir / name
         rundir.mkdir()
         print(f"=== {name} ({cfg['engine']}) ...", flush=True)

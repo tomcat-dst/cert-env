@@ -1,1 +1,0 @@
-source: https://github.com/ArduPilot/SITL_Models @ 28de13e (2026-11-14)
