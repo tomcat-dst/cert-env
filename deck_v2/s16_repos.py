@@ -1,4 +1,4 @@
-"""Slide (code, after the conclusions): the two public forks and the private working repo, with what each holds.
+"""Slide (code, after the conclusions): the two forks and the working repo (all public), with what each holds.
 
 Commit lists from `git log Plane-4.7.3..cert-rfsearch` (src/ardupilot) and `git log 3a67d31..rf-scan-overlay`
 (src/qgroundcontrol); visibility from the GitHub API. The repo names are left out of the image: they are clickable
@@ -25,8 +25,8 @@ repos = [
      "2 коміти:",
      ["карта пеленгів: промені, еліпси 1σ,", "справжні джерела (лише в SITL)", "режим RFSearch у списку режимів",
       "метадані Plane 4.7 з групою RFS_:", "опис параметрів RFS_ у QGC"]),
-    ("Робоче середовище", d.C["usb"], None,
-     "приватний репозиторій · гілка main",
+    ("Робоче середовище", d.C["usb"], "https://github.com/tomcat-dst/cert-env",
+     "гілка main · SITL, місії, компаньйон",
      "що всередині:",
      ["rf_companion.py: синтетичний канал,", "пеленги, оцінки з еліпсами",
       "mission.py: SITL + QGC, втрата RC", "моделі Believer (AVL, JSON), параметри", "плани місій QGC (.plan)",
@@ -44,7 +44,7 @@ for i, (title, col, url, branch, head, items) in enumerate(repos):
     d.note(ax, x + 1, LINK_Y - 6.0, head, size=13.5, color=d.INK, va="top", bold=True)
     for j, ln in enumerate(items):
         d.note(ax, x + 1, LINK_Y - 8.4 - j * 2.05, ln, size=13, va="top")
-    if url:                     # QR to the branch, bottom right of the box
+    if url:                     # QR to the repo / branch, bottom right of the box
         q = segno.make(url, error="m")
         m = [[1 - v for v in row] for row in q.matrix_iter(border=2)]
         x1, y1 = x + w - 1.0 - QR_SIDE, 1.5
