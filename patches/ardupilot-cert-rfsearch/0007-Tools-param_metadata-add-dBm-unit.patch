@@ -1,0 +1,27 @@
+From bd5c848c907dabc4c5a6a6fe0ff5aa6ed7c09d9d Mon Sep 17 00:00:00 2001
+From: Vlad Syan <vlad.syan@gmail.com>
+Date: Wed, 25 Nov 2026 11:11:57 +0200
+Subject: [PATCH 7/7] Tools: param_metadata: add dBm unit
+
+RFS_THR_DBM is an RF power in dBm; without the unit param_parse.py rejects it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ Tools/autotest/param_metadata/param.py | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/Tools/autotest/param_metadata/param.py b/Tools/autotest/param_metadata/param.py
+index b0b02c8e10..20a2863506 100644
+--- a/Tools/autotest/param_metadata/param.py
++++ b/Tools/autotest/param_metadata/param.py
+@@ -117,6 +117,7 @@ known_units = {
+              '%/s'     : 'percent per second'    ,
+              'd%'      : 'decipercent'           , # decipercent is strange, but "per-mille" is even more exotic
+              'dB'      : 'decibel'               ,
++             'dBm'     : 'decibel-milliwatts'    ,
+ # compound
+ 
+              'kB'      : 'kilobytes'               ,
+-- 
+2.43.0
+

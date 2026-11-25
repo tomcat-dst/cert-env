@@ -3,6 +3,7 @@
 # model's clean stall at 5 kg (~11.6 m/s); maximum 28 m/s.
 AIRSPEED_CRUISE 20
 AIRSPEED_MIN    14
+AIRSPEED_STALL  12
 AIRSPEED_MAX    28
 # Cruise throttle estimated for the real aircraft (X3120 585KV + APC 11x7 on 22.2 V).
 # SITL's linear thrust needs far less, so expect the log to show the difference.

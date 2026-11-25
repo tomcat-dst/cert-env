@@ -1,7 +1,7 @@
 From dc05aa4f42078b01ac879047925152f0bce40109 Mon Sep 17 00:00:00 2001
 From: Vlad Syan <vlad.syan@gmail.com>
 Date: Sun, 22 Nov 2026 15:12:29 +0200
-Subject: [PATCH 2/6] SITL: add optional electric propulsion model to plane
+Subject: [PATCH 2/7] SITL: add optional electric propulsion model to plane
 
 The plane model's thrust is linear in throttle and independent of
 airspeed (full throttle = weight / 0.7), and battery current is a fixed

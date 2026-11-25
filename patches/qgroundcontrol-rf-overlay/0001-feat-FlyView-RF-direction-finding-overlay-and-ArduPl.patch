@@ -1,7 +1,7 @@
 From e31f940d8ac373e5d38453fb8dbec8cc0a7b6fd6 Mon Sep 17 00:00:00 2001
 From: Vlad Syan <vlad.syan@gmail.com>
 Date: Wed, 25 Nov 2026 10:54:48 +0200
-Subject: [PATCH] feat(FlyView): RF direction-finding overlay and ArduPlane
+Subject: [PATCH 1/2] feat(FlyView): RF direction-finding overlay and ArduPlane
  RFSearch mode
 
 For a SITL demo with a companion that reports received RF power:

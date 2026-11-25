@@ -1,7 +1,7 @@
 From adcd8deec0e8fc0074c03b7f4cddb2b8435cb536 Mon Sep 17 00:00:00 2001
 From: Vlad Syan <vlad.syan@gmail.com>
 Date: Wed, 25 Nov 2026 10:54:24 +0200
-Subject: [PATCH 5/6] SITL: plane json models can define a catapult launcher
+Subject: [PATCH 5/7] SITL: plane json models can define a catapult launcher
 
 launch_accel (m/s^2 along body x) and launch_time (s) in the model json
 enable the same launcher the -catapult frame has (servo 7 > 1700), so a

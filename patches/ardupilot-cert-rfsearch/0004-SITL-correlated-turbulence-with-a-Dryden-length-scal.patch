@@ -1,7 +1,7 @@
 From 304520b5cf23e02d92deb7dc92afdb2ef495cc05 Mon Sep 17 00:00:00 2001
 From: Vlad Syan <vlad.syan@gmail.com>
 Date: Wed, 25 Nov 2026 10:54:24 +0200
-Subject: [PATCH 4/6] SITL: correlated turbulence with a Dryden length scale
+Subject: [PATCH 4/7] SITL: correlated turbulence with a Dryden length scale
 
 The old model added 2*rand() to the gust azimuth every step; the int overflow
 made the gust direction white noise at the frame rate (correlation about one

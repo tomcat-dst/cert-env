@@ -48,6 +48,8 @@ ROLL_LIMIT_DEG   30
 RTL_ALTITUDE     -1
 AIRSPEED_MAX     25
 AIRSPEED_MIN     14
+# AIRSPEED_STALL 12 (2026-11-25, user): the 5.0 kg model stalls at 11.6 m/s; used by stall prevention in banks and as the TECS floor on landing final
+AIRSPEED_STALL   12
 AIRSPEED_CRUISE  19
 WP_LOITER_RAD    120
 WP_RADIUS        120

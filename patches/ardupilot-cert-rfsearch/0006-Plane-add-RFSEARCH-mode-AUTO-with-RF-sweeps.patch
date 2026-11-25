@@ -1,7 +1,7 @@
 From f4450fe92c10ea2fd0e3a8679260c30870527588 Mon Sep 17 00:00:00 2001
 From: Vlad Syan <vlad.syan@gmail.com>
 Date: Wed, 25 Nov 2026 10:54:24 +0200
-Subject: [PATCH 6/6] Plane: add RFSEARCH mode (AUTO with RF sweeps)
+Subject: [PATCH 6/7] Plane: add RFSEARCH mode (AUTO with RF sweeps)
 
 RFSEARCH (mode 27, "RFSR") flies the mission like AUTO; it is mode_auto with
 a flag, so every AUTO check (take-off, landing, failsafes, fence) still
