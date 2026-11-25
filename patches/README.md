@@ -7,3 +7,7 @@
 | `ardupilot-sitl-plane-electric-propulsion.patch` | ArduPilot 4.7.3 working tree | earlier single-file version of the SITL changes |
 | `qgroundcontrol-rf-overlay/` | QGroundControl 3a67d31, `git am` | RF overlay, `rf` fact group, ArduPlane RFSearch mode name |
 | `gz-rendering8-ubuntu-ogre-next-debug-abi.patch` | gz-rendering 8 | build fix for Ubuntu's ogre-next |
+
+The same commits are on public branches:
+[tomcat-dst/ardupilot `cert-rfsearch`](https://github.com/tomcat-dst/ardupilot/tree/cert-rfsearch) (ArduPilot) and
+[tomcat-dst/qgroundcontrol `rf-scan-overlay`](https://github.com/tomcat-dst/qgroundcontrol/tree/rf-scan-overlay) (QGroundControl).
