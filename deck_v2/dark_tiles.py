@@ -10,7 +10,7 @@ from s01_assets import EMU_PX, background
 BOX = (126, 270, 2142, 1000)         # the area under a one-line 28 pt title, the same on slides 2-12
 SRC = {"s03": "s03_mission", "s04": "s04_wiring", "s05": "s05_loadouts", "s06": "s06_power",
        "s07": "s07_failsafe", "s08": "s08_sitl", "s10": "s10_log", "s11": "s11_autotune", "s13": "s13_next",
-       "s14": "s14_rfsearch", "s15": "s15_scenarios"}
+       "s14": "s14_rfsearch", "s15": "s15_scenarios", "s16": "s16_repos"}
 TILES = {key: BOX for key in SRC}
 
 bg = background()
