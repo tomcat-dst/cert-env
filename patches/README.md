@@ -8,6 +8,7 @@
 | `qgroundcontrol-rf-overlay/` | QGroundControl 3a67d31, `git am` | RF overlay, `rf` fact group, ArduPlane RFSearch mode name, Plane 4.7 parameter metadata with RFS_ |
 | `gz-rendering8-ubuntu-ogre-next-debug-abi.patch` | gz-rendering 8 | build fix for Ubuntu's ogre-next |
 
-The same commits are on public branches:
+The same commits are on public branches (the ArduPilot fork is one commit behind: 0009, the RC-failsafe fix of
+2026-11-25, is not pushed there yet):
 [tomcat-dst/ardupilot `cert-rfsearch`](https://github.com/tomcat-dst/ardupilot/tree/cert-rfsearch) (ArduPilot) and
 [tomcat-dst/qgroundcontrol `rf-scan-overlay`](https://github.com/tomcat-dst/qgroundcontrol/tree/rf-scan-overlay) (QGroundControl).

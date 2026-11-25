@@ -1,4 +1,4 @@
-"""Slides 2-13 (dark theme): put each transparent diagram PNG on the slide-1 grain background,
+"""Slides 2-12 (dark theme): put each transparent diagram PNG on the slide-1 grain background,
 cut at the diagram's own slide box, so the grain runs through without a visible edge.
 Boxes are in the 2400 x 1350 grid of s01_assets (5080 EMU per px); the printed EMU values are the
 transforms the slide elements must get.
@@ -7,26 +7,11 @@ from PIL import Image
 
 from s01_assets import EMU_PX, background
 
-FULL = (126, 364, 2142, 936)        # the area under a slide title
-TILES = {f"s{n:02d}": FULL for n in range(2, 14)}
-TILES["s09"] = (1314, 378, 954, 828)  # slide 9: flight profile beside the QGC screenshot
-TILES["s02"] = (126, 270, 2142, 1000)  # one-line title at 28 pt, taller area
-TILES["s03"] = TILES["s02"]
-TILES["s04"] = TILES["s02"]
-TILES["s05"] = TILES["s02"]
-TILES["s06"] = TILES["s02"]
-TILES["s07"] = TILES["s02"]
-TILES["s08"] = TILES["s02"]
-TILES["s10"] = TILES["s02"]  # log, merged AUTOTUNE and conclusions moved to the one-line-title layout (2026-11-25)
-TILES["s11"] = TILES["s02"]
-TILES["s13"] = TILES["s02"]
-del TILES["s12"]             # the result slide is merged into s11
-TILES["s14"] = TILES["s02"]  # RFSEARCH, after the SITL mission
-TILES["s15"] = TILES["s02"]  # the two RFSEARCH flights (replaces the 23.11 mission slide)
-SRC = {"s02": "s02_hook", "s03": "s03_mission", "s04": "s04_wiring", "s05": "s05_loadouts",
-       "s06": "s06_power", "s07": "s07_failsafe", "s08": "s08_sitl", "s09": "s09_flight",
-       "s10": "s10_log", "s11": "s11_autotune", "s13": "s13_next",
+BOX = (126, 270, 2142, 1000)         # the area under a one-line 28 pt title, the same on slides 2-12
+SRC = {"s03": "s03_mission", "s04": "s04_wiring", "s05": "s05_loadouts", "s06": "s06_power",
+       "s07": "s07_failsafe", "s08": "s08_sitl", "s10": "s10_log", "s11": "s11_autotune", "s13": "s13_next",
        "s14": "s14_rfsearch", "s15": "s15_scenarios"}
+TILES = {key: BOX for key in SRC}
 
 bg = background()
 for key, (x, y, w, h) in TILES.items():

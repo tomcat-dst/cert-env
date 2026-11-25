@@ -27,7 +27,7 @@ for i in range(1, len(pts)):
     s.append(s[-1] + math.hypot(E[i] - E[i - 1], N[i] - N[i - 1]))
     alt.append(pts[i][2])
     home.append(math.hypot(E[i], N[i]))
-SRC = [(16.0, -2.5), (19.5, 2.0)]            # scenario "two": (north, east) km
+SRC = [(16.0, 2.5), (19.5, -2.0)]            # scenario "two" in rf_companion.py: (north, east) km
 fig = c.figure(16, 16 * d.H / d.W)
 
 # --- map, km from home ---
@@ -44,7 +44,7 @@ m.plot([0], [0], "s", color=d.INK, ms=8)
 for n, e in SRC:
     m.plot(e, n, marker="*", ms=15, color=d.C["power"])
 m.text(0.9, -1.9, "дім: катапульта,\nпосадка із заходу", fontsize=11.5, color=d.INK, ha="left", va="center")
-m.text(-4.6, 3.9, "RC ≈ 5 км", fontsize=12, color=d.C["rc"], ha="center", va="bottom", fontweight="bold")
+m.text(-0.6, 3.3, "RC ≈ 5 км", fontsize=12, color=d.C["rc"], ha="center", va="bottom", fontweight="bold")
 m.text(0.0, 23.3, "район пошуку", fontsize=12, color=d.C["power"], ha="center", va="bottom", fontweight="bold")
 m.text(9.6, 11.5, "900 м, 19 м/с", fontsize=11.5, color=c.ACC, ha="left", va="center", rotation=90)
 m.text(0.0, 1.03, "маршрут, км від дому · geofence 35 км — за межами карти", transform=m.transAxes, fontsize=12,
