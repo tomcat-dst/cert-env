@@ -212,6 +212,9 @@ RF_ELLIPSE = [
 # (~106 km) at first, but with the route 10-18 km from the cluster on its near half, four sources 4.7-8.7 km apart
 # came out 100-970 m off; 4 km brings the route in. The far vertex is 28 km out, inside the 35 km fence.
 # Hidden sources for it: rf_companion.py scenario "sw4".
+# NOTE: tsuniv_rf_ellipse_sw.plan was reworked in QGC on 2026-11-25 14:01 (wider loop on the far side, 21 items,
+# landing from the west) and saved over the generated file: QGC's file is the source now, do not regenerate it
+# (it is left out of MISSIONS below; RF_ELLIPSE_SW stays as the record of the generated route).
 RFW_BRG, RFW_D, RFW_STANDOFF, RFW_POINTS = 225.0, 24000.0, 4000.0, 14
 RFW_A, RFW_C = (RFW_D + RFW_STANDOFF) / 2, (RFW_D - RFW_STANDOFF) / 2
 RFW_B = math.sqrt(RFW_A ** 2 - RFW_C ** 2)
@@ -235,7 +238,7 @@ RF_ELLIPSE_SW = [
 
 MISSIONS = {"tsuniv_search.plan": (SHORT, 9000.0), "tsuniv_search_long.plan": (LONG, 35000.0),
             "tsuniv_rf_search.plan": (RF, 15000.0), "tsuniv_rf_multi.plan": (RF_MULTI, 35000.0),
-            "tsuniv_rf_ellipse.plan": (RF_ELLIPSE, 35000.0), "tsuniv_rf_ellipse_sw.plan": (RF_ELLIPSE_SW, 35000.0)}
+            "tsuniv_rf_ellipse.plan": (RF_ELLIPSE, 35000.0)}
 # tsuniv_rf_sweep.plan started as RF_SWEEP but has since been reworked in QGC (2026-11-24): QGC's file is
 # the source now and is not rewritten here
 

@@ -1,0 +1,175 @@
+14:32:13  t=   22.7  uploaded tsuniv_rf_ellipse.plan without QGC: 17 mission items, 1 fence items
+14:32:13  t=   22.7  mode MANUAL
+14:32:13  t=   22.7  mission item 0  (0.00 km from home, -0 m)
+14:32:13  t=    0.0  text: Barometer 1 calibration complete
+14:32:13  t=    0.0  text: Barometer 2 calibration complete
+14:32:13  t=    0.0  text: Airspeed 1 calibration started
+14:32:13  t=    0.0  text: ArduPilot Ready
+14:32:13  t=    0.0  text: AHRS: DCM active
+14:32:13  t=    3.3  text: Airspeed 1 calibrated
+14:32:13  t=    6.8  text: RF: companion up, sweeps in RFSEARCH
+14:32:13  t=    9.0  text: GPS 1: probing for u-blox at 230400 baud
+14:32:13  t=    9.0  text: GPS 1: detected u-blox
+14:32:13  t=    9.8  text: EKF2 IMU0 MAG0 initial yaw alignment complete
+14:32:13  t=    9.8  text: EKF2 IMU1 MAG0 initial yaw alignment complete
+14:32:13  t=   10.2  text: EKF3 IMU0 initialised
+14:32:13  t=   10.2  text: EKF3 IMU1 initialised
+14:32:13  t=   12.0  text: EKF3 IMU0 tilt alignment complete
+14:32:13  t=   12.0  text: EKF3 IMU1 tilt alignment complete
+14:32:13  t=   12.0  text: EKF3 IMU0 MAG0 initial yaw alignment complete
+14:32:13  t=   12.0  text: EKF3 IMU1 MAG0 initial yaw alignment complete
+14:32:13  t=   14.8  text: EKF2 IMU0 tilt alignment complete
+14:32:13  t=   14.8  text: EKF2 IMU1 tilt alignment complete
+14:32:13  t=   19.4  text: EKF2 IMU0 origin set
+14:32:13  t=   19.4  text: EKF2 IMU1 origin set
+14:32:13  t=   19.4  text: EKF3 IMU0 origin set
+14:32:13  t=   19.4  text: EKF3 IMU1 origin set
+14:32:13  t=   19.5  text: Field Elevation Set: 290m
+14:32:13  t=   20.4  text: EKF3 IMU0 is using GPS
+14:32:13  t=   20.4  text: EKF3 IMU1 is using GPS
+14:32:13  t=   20.4  text: AHRS: EKF3 active
+14:32:13  t=   22.7  text: Fence Indexed OK
+14:32:13  t=   22.7  ARMED
+14:32:13  t=   22.7  mode RFSEARCH
+14:32:13  t=   22.7  catapult released (servo 7 = 2000)
+14:32:13  t=   22.7  text: Mission: 1 Takeoff
+14:32:13  t=   22.7  text: Throttle armed
+14:32:13  t=   23.2  text: Armed AUTO, xaccel = 15.4 m/s/s, waiting 0.2 sec
+14:32:13  t=   23.3  mission item 1  (0.00 km from home, 0 m)
+14:32:13  t=   23.3  text: Triggered AUTO. GPS speed = 1.4
+14:32:13  t=   23.5  text: Holding course 10899 at 6.0m/s (0.0)
+14:32:13  t=   23.5  text: Autoland direction= 108
+14:32:14  t=   42.2  text: Takeoff level-off starting at 11m
+14:32:14  t=   44.2  text: Takeoff complete at 116.91m
+14:32:14  t=   44.2  text: Mission: 2 WP
+14:32:14  t=   44.3  mission item 2  (0.48 km from home, 117 m)
+14:32:14  t=   44.9  text: EKF2 IMU0 is using GPS
+14:32:14  t=   44.9  text: EKF2 IMU1 is using GPS
+14:32:20  t=  170.7  text: Reached waypoint #2 dist 2m
+14:32:20  t=  170.7  text: Mission: 3 WP
+14:32:20  t=  171.0  mission item 3  (2.84 km from home, 393 m)
+14:32:37  t=  512.4  text: Reached waypoint #3 dist 14m
+14:32:37  t=  512.4  text: Mission: 4 WP
+14:32:37  t=  512.5  mission item 4  (9.54 km from home, 697 m)
+14:32:38  t=  524.4  text: RFS: sweep 1, course 85, -90.0 dBm
+14:32:38  t=  524.4  text: RF: sweep 1
+14:32:39  t=  547.5  text: RFS: sweep 1 done, 69 readings, peak -74.0 dBm
+14:32:39  t=  552.8  text: RF: bearing 1 = 144.8 +-2.0, -72 dBm, 91 valid
+14:32:46  t=  697.9  text: RFS: sweep 2, course 85, -91.3 dBm
+14:32:46  t=  697.9  text: RF: sweep 2
+14:32:48  t=  721.0  text: RFS: sweep 2 done, 69 readings, peak -71.6 dBm
+14:32:48  t=  725.3  text: RF: bearing 2 = 169.1 +-3.0, -70 dBm, 92 valid
+14:32:56  t=  870.8  text: RFS: sweep 3, course 85, -91.5 dBm
+14:32:56  t=  870.8  text: RF: sweep 3
+14:32:57  t=  893.9  text: RFS: sweep 3 done, 70 readings, peak -71.7 dBm
+14:32:57  t=  896.5  text: RF: bearing 3 = 193.5 +-2.0, -71 dBm, 92 valid
+14:33:01  t=  965.7  text: Reached waypoint #4 dist 23m
+14:33:01  t=  965.7  text: Mission: 5 WP
+14:33:01  t=  965.8  mission item 5  (17.09 km from home, 898 m)
+14:33:07  t= 1043.1  text: RFS: sweep 4, course 116, -91.2 dBm
+14:33:07  t= 1043.1  text: RF: sweep 4
+14:33:07  t= 1055.1  text: RF: 3 obs: S1 +-422
+14:33:08  t= 1066.3  text: RFS: sweep 4 done, 70 readings, peak -73.4 dBm
+14:33:08  t= 1069.0  text: RF: bearing 4 = 215.6 +-2.2, -72 dBm, 92 valid
+14:33:18  t= 1204.9  text: Reached waypoint #5 dist 24m
+14:33:18  t= 1204.9  text: Mission: 6 WP
+14:33:18  t= 1205.0  mission item 6  (20.63 km from home, 900 m)
+14:33:18  t= 1215.4  text: RFS: sweep 5, course 148, -93.6 dBm
+14:33:18  t= 1215.4  text: RF: sweep 5
+14:33:20  t= 1238.7  text: RFS: sweep 5 done, 70 readings, peak -75.1 dBm
+14:33:20  t= 1242.3  text: RF: bearing 5 = 236.8 +-2.2, -73 dBm, 83 valid
+14:33:21  t= 1253.3  text: RF: 5 obs: S1 +-249
+14:33:31  t= 1387.8  text: RFS: sweep 6, course 148, -93.8 dBm
+14:33:31  t= 1387.8  text: RF: sweep 6
+14:33:33  t= 1411.0  text: RFS: sweep 6 done, 69 readings, peak -75.3 dBm
+14:33:33  t= 1416.8  text: RF: bearing 6 = 256.1 +-2.0, -74 dBm, 72 valid
+14:33:37  t= 1462.6  text: RF: 6 obs: S1 +-201
+14:33:43  t= 1541.0  text: Reached waypoint #6 dist 24m
+14:33:43  t= 1541.0  text: Mission: 7 WP
+14:33:43  t= 1541.3  mission item 7  (23.84 km from home, 900 m)
+14:33:44  t= 1560.1  text: RFS: sweep 7, course 180, -96.6 dBm
+14:33:44  t= 1560.1  text: RF: sweep 7
+14:33:46  t= 1583.4  text: RFS: sweep 7 done, 68 readings, peak -77.4 dBm
+14:33:47  t= 1587.5  text: RF: bearing 7 = 273.1 +-2.0, -76 dBm, 46 valid
+14:33:56  t= 1725.5  text: RF: 7 obs: S1 +-177
+14:33:57  t= 1732.5  text: RFS: sweep 8, course 180, -95.6 dBm
+14:33:57  t= 1732.5  text: RF: sweep 8
+14:33:58  t= 1755.7  text: RFS: sweep 8 done, 70 readings, peak -76.3 dBm
+14:33:59  t= 1759.0  text: RF: bearing 8 = 288.8 +-2.2, -76 dBm, 38 valid
+14:34:06  t= 1846.9  text: Reached waypoint #7 dist 42m
+14:34:06  t= 1846.9  text: Mission: 8 WP
+14:34:06  t= 1847.3  mission item 8  (24.99 km from home, 900 m)
+14:34:10  t= 1904.8  text: RFS: sweep 9, course 234, -96.1 dBm
+14:34:10  t= 1904.8  text: RF: sweep 9
+14:34:11  t= 1928.0  text: RFS: sweep 9 done, 70 readings, peak -77.9 dBm
+14:34:12  t= 1931.3  text: RF: bearing 9 = 303.6 +-2.0, -77 dBm, 31 valid
+14:34:17  t= 2000.6  text: RF: 9 obs: S1 +-149
+14:34:23  t= 2092.5  text: Reached waypoint #8 dist 21m
+14:34:23  t= 2092.5  text: Mission: 9 WP
+14:34:23  t= 2092.7  mission item 9  (22.77 km from home, 900 m)
+14:34:24  t= 2101.9  text: RFS: sweep 10, course 262, -95.1 dBm
+14:34:24  t= 2101.9  text: RF: sweep 10
+14:34:26  t= 2125.1  text: RFS: sweep 10 done, 68 readings, peak -76.4 dBm
+14:34:26  t= 2128.0  text: RF: bearing 10 = 320.8 +-2.0, -76 dBm, 52 valid
+14:34:38  t= 2281.5  text: Reached waypoint #9 dist 18m
+14:34:38  t= 2281.5  text: Mission: 10 WP
+14:34:38  t= 2281.8  mission item 10  (20.16 km from home, 900 m)
+14:34:38  t= 2283.0  text: RF: 10 obs: S1 +-142
+14:34:39  t= 2290.9  text: RFS: sweep 11, course 287, -94.5 dBm
+14:34:39  t= 2290.9  text: RF: sweep 11
+14:34:40  t= 2314.2  text: RFS: sweep 11 done, 69 readings, peak -77.1 dBm
+14:34:41  t= 2318.0  text: RF: bearing 11 = 339.7 +-2.4, -74 dBm, 79 valid
+14:34:51  t= 2463.3  text: RFS: sweep 12, course 287, -92.4 dBm
+14:34:51  t= 2463.3  text: RF: sweep 12
+14:34:53  t= 2486.4  text: RFS: sweep 12 done, 68 readings, peak -72.6 dBm
+14:34:54  t= 2491.0  text: RF: bearing 12 = 359.1 +-2.0, -71 dBm, 90 valid
+14:34:57  t= 2544.0  text: Reached waypoint #10 dist 8m
+14:34:57  t= 2544.0  text: Mission: 11 WP
+14:34:57  t= 2544.3  mission item 11  (16.03 km from home, 900 m)
+14:35:00  t= 2579.8  text: RF: 12 obs: S1 +-141
+14:35:04  t= 2635.5  text: RFS: sweep 13, course 299, -90.1 dBm
+14:35:04  t= 2635.5  text: RF: sweep 13
+14:35:06  t= 2658.7  text: RFS: sweep 13 done, 67 readings, peak -72.5 dBm
+14:35:06  t= 2663.2  text: RF: bearing 13 = 24.3 +-2.0, -71 dBm, 90 valid
+14:35:16  t= 2797.5  text: Reached waypoint #11 dist 12m
+14:35:16  t= 2797.5  text: Mission: 12 WP
+14:35:16  t= 2797.8  mission item 12  (11.48 km from home, 900 m)
+14:35:17  t= 2807.8  text: RFS: sweep 14, course 317, -90.4 dBm
+14:35:17  t= 2807.8  text: RF: sweep 14
+14:35:19  t= 2831.0  text: RFS: sweep 14 done, 67 readings, peak -72.1 dBm
+14:35:19  t= 2834.0  text: RF: bearing 14 = 47.0 +-2.0, -71 dBm, 91 valid
+14:35:25  t= 2903.8  text: RF: 14 obs: S1 +-129
+14:35:30  t= 2981.2  text: RFS: sweep 15, course 317, -93.1 dBm
+14:35:30  t= 2981.3  text: RF: sweep 15
+14:35:32  t= 3004.1  text: RFS: sweep 15 done, 66 readings, peak -73.8 dBm
+14:35:32  t= 3007.8  text: RF: bearing 15 = 71.4 +-2.2, -72 dBm, 89 valid
+14:35:42  t= 3142.5  text: Reached waypoint #12 dist 0m
+14:35:42  t= 3142.5  text: Mission: 13 LandStart
+14:35:42  t= 3142.5  text: Mission: 14 WP
+14:35:42  t= 3142.8  mission item 14  (5.45 km from home, 501 m)
+14:35:42  t= 3142.8  text: RF: landing, final solve over 15 sweeps
+14:35:49  t= 3239.5  text: Reached waypoint #14 dist 4m
+14:35:49  t= 3239.5  text: Mission: 15 WP
+14:35:49  t= 3239.8  mission item 15  (3.52 km from home, 292 m)
+14:35:51  t= 3271.8  text: RF: 15 obs: S1 +-122
+14:35:55  t= 3336.5  text: Reached waypoint #15 dist 15m
+14:35:55  t= 3336.5  text: Mission: 16 Land
+14:35:55  t= 3336.5  text: Landing approach start at 78.7m
+14:35:55  t= 3336.8  mission item 16  (1.61 km from home, 79 m)
+14:35:56  t= 3341.5  text: Landing glide slope 2.3 degrees
+14:36:01  t= 3418.8  text: Flare 3.0m sink=0.67 speed=16.7 dist=97.5
+14:36:02  t= 3423.0  text: SIM Hit ground at 0.634468 m/s
+14:36:04  t= 3453.0  text: Throttle disarmed
+14:36:04  t= 3453.0  text: Auto disarmed
+14:36:04  t= 3453.0  text: Distance from LAND point=16.45m
+14:36:04  t= 3454.0  DISARMED
+14:36:04  t= 3454.0  landed and disarmed: 84 m from home, -0.0 m, ground speed 0.0 m/s
+14:36:04  t= 3454.0  mode MANUAL
+14:36:04  t= 3454.0  text: In landing sequence: mission reset
+14:36:04  t= 3454.0  text: Restarted landing via DO_LAND_START: 13
+14:36:04  t= 3454.0  mission item 1  (0.08 km from home, -0 m)
+14:36:04  t= 3454.0  mission set back to item 1 (take-off): landing sequence cleared
+14:36:04  t= 3454.0  stopping
+14:36:14  RF result written
+
+Results: /home/tomcat/cert-env/compare/results/mission-20261125-143209-i8/believer-5kg-avl-at

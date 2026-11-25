@@ -68,6 +68,21 @@ SCENARIOS = {"single": [(*SOURCE, 47.0)],
 # The raw fit sigma tracks the error (correlation 0.82) and widens for weak peaks, but assumes
 # independent readings, which neighbouring readings in a sweep are not.
 PEAK_SIGMA_SCALE, PEAK_SIGMA_FLOOR_DEG = 3.0, 1.25
+# signal level in the bearing weight (2026-11-25): over 3294 helix bearings with known sources the median error fell
+# from 2.2 deg at -78 dBm to 1.3 deg at -64 dBm while the fitted sigma hardly moved (3.0 -> 2.4), partly because a strong
+# peak is a near source, further in angle from its neighbours (compare/rfsearch/bearing_accuracy.py). Sigma is scaled
+# by 10^(-(dBm - LEVEL_REF_DBM) / LEVEL_DB_PER_DECADE), clamped to LEVEL_FACTOR_MIN..MAX
+# OFF: flown on 13 flights it made the fixes worse (east median 40 -> 54 m, max 165 -> 223; south-west 40 -> 99,
+# max 153 -> 330): tighter ellipses on strong bearings become a tighter prior for the position refinement, which
+# already uses the signal level directly (it fits every raw reading in dB)
+LEVEL_WEIGHT = False
+LEVEL_REF_DBM, LEVEL_DB_PER_DECADE, LEVEL_FACTOR_MIN, LEVEL_FACTOR_MAX = -74.0, 60.0, 0.6, 1.6
+
+
+def level_factor(dbm):
+    if not LEVEL_WEIGHT:
+        return 1.0
+    return min(max(10 ** (-(dbm - LEVEL_REF_DBM) / LEVEL_DB_PER_DECADE), LEVEL_FACTOR_MIN), LEVEL_FACTOR_MAX)
 # source ellipses from the bearings are too large once the position is refined against all readings:
 # x0.6 puts the true source inside the 2-sigma ellipse in 87 % of 30 offline fixes (86 % expected for a
 # 2-D Gaussian), 53 % inside 1 sigma (39 % expected), 100 % inside 3 sigma
@@ -82,6 +97,15 @@ MERGE_M = 1500.0                         # refined fixes closer than this are on
 ESTIMATOR_V2 = True
 STICKY_GATE = 5.0                        # sigma; a new assignment needs the usual 3
 PRIOR_MATCH_M, PRIOR_SCALE, PRIOR_MIN_M = 2000.0, 2.0, 150.0   # prior sigma = max(scale x previous, min)
+# v3 (2026-11-25): a bearing is tested against a source's ellipse plus its own sigma in metres (not a fixed angle
+# at the fix), so a bearing across a long ellipse, which corrects its long axis, is accepted; and the widening adds
+# uncertainty only along the fit-vs-crossing offset instead of scaling both axes. OFF: on 14 flights it was worse
+# than v2 (east median 44 -> 58 m, p90 87 -> 177; south-west 40 -> 156, max 153 -> 664): the wider gate lets
+# neighbours' bearings in
+ESTIMATOR_V3 = False
+# a bearings' crossing is taken no further than CROSS_MAX_M from the fix; the widening is capped at WIDEN_MAX sigma
+# (x10 in size). A tight cap (5) was tried and made fixes worse: a small ellipse is a stiff prior for the next update
+CROSS_MAX_M, WIDEN_MAX = 20000.0, 20.0
 MOVED_WARN_MIN_BRG = 4                   # "moved outside its ellipse" only with at least this many bearings
 # largest subset of candidates select_sources tries: C(10, <=4) = 385 fits. 5 was tried (2026-11-25) and let a false
 # fifth source in when four overlapping real ones were there
@@ -497,15 +521,50 @@ def bearing_ellipse(pos, bearings, scale=ELLIPSE_SCALE):
             float(math.degrees(math.atan2(major[1], major[0])) % 180))
 
 
-def assign_bearings(bearings, fixes, gate=3.0, prev=None):
+def ellipse_cov(ell):
+    """2x2 covariance (north, east) of an ellipse (semi-major, semi-minor, major-axis azimuth deg)."""
+    a, b, ori = ell
+    u = np.array([math.cos(math.radians(ori)), math.sin(math.radians(ori))])
+    v = np.array([-u[1], u[0]])
+    return a * a * np.outer(u, u) + b * b * np.outer(v, v)
+
+
+def cov_ellipse(c):
+    vals, vecs = np.linalg.eigh(c)
+    major = vecs[:, 1]
+    return (float(math.sqrt(max(vals[1], 0.0))), float(math.sqrt(max(vals[0], 0.0))),
+            float(math.degrees(math.atan2(major[1], major[0])) % 180))
+
+
+def bearing_miss(b, f, ell=None):
+    """How far bearing b misses fix f, in standard deviations: the fix's distance from the bearing line over the
+    combined spread of the bearing (its sigma at that range) and, with ell, the fix's own ellipse across the line.
+    Without ell this is the angular miss over max(sigma, 2 deg)."""
+    n, e = ned(b["pos"], f["pos"])
+    r = math.hypot(n, e)
+    err = math.radians(((math.degrees(math.atan2(e, n)) - b["bearing"] + 180) % 360) - 180)
+    if abs(err) > math.pi / 2 or r < 1.0:
+        return 1e9
+    s_b = r * math.radians(max(b["sigma"], 2.0))
+    var = s_b * s_b
+    if ell is not None:
+        u = np.array([-e / r, n / r])                 # across the line of sight
+        var += float(u @ ellipse_cov(ell) @ u)
+    return abs(r * math.sin(err)) / math.sqrt(var)
+
+
+def assign_bearings(bearings, fixes, gate=3.0, prev=None, ells=None):
     """Which source each bearing points at: pairs within `gate` (in units of max(sigma, 2 deg)) of the
     direction from the bearing's origin to a fix, closest first, at most one bearing per observation
     point per source. fixes: {id: fix}. Returns {bearing id: source id} (unassigned bearings left out)."""
     pairs = []
     for b in bearings:
         for sid, f in fixes.items():
-            n, e = ned(b["pos"], f["pos"])
-            err = abs(((math.degrees(math.atan2(e, n)) - b["bearing"] + 180) % 360) - 180) / max(b["sigma"], 2.0)
+            if ells is not None:
+                err = bearing_miss(b, f, ells.get(sid))
+            else:
+                n, e = ned(b["pos"], f["pos"])
+                err = abs(((math.degrees(math.atan2(e, n)) - b["bearing"] + 180) % 360) - 180) / max(b["sigma"], 2.0)
             # v2: a bearing keeps the source it had while within STICKY_GATE, ahead of any new pairing
             kept = prev is not None and prev.get(b["id"]) == sid and err < STICKY_GATE
             if err < gate or kept:
@@ -518,13 +577,16 @@ def assign_bearings(bearings, fixes, gate=3.0, prev=None):
     return out
 
 
-def ambiguous_bearings(bearings, fixes, gate=3.0):
+def ambiguous_bearings(bearings, fixes, gate=3.0, ells=None):
     """Ids of the bearings within `gate` of two or more fixes: their peak may be either source (or both,
     merged), so they say nothing about either position."""
     out = set()
     for b in bearings:
         hits = 0
-        for f in fixes.values():
+        for sid, f in fixes.items():
+            if ells is not None:
+                hits += bearing_miss(b, f, ells.get(sid)) < gate
+                continue
             n, e = ned(b["pos"], f["pos"])
             hits += abs(((math.degrees(math.atan2(e, n)) - b["bearing"] + 180) % 360) - 180) / max(b["sigma"], 2.0) < gate
         if hits > 1:
@@ -551,6 +613,12 @@ def bearing_crossing(pos, bearings):
         x = x + dx
         if np.hypot(*dx) < 0.5:
             break
+    # near-parallel bearings can send the iteration far away (it overflowed RF_FIX once): no further than
+    # CROSS_MAX_M, which still reads as "far outside the ellipse"
+    if not np.all(np.isfinite(x)):
+        return None
+    if np.hypot(*x) > CROSS_MAX_M:
+        x = x * (CROSS_MAX_M / np.hypot(*x))
     return latlon(pos, x[0], x[1])
 
 
@@ -604,6 +672,7 @@ class Gcs:
         else:
             f = self.fixes[sid]
             major, minor, orient = f.get("ellipse_m_deg", (f["sigma_m"], f["sigma_m"], 0.0))
+            major, minor = (min(max(float(v), 1.0), 50000.0) if math.isfinite(v) else 50000.0 for v in (major, minor))
             self._array(b"RF_FIX", sid, [f["pos"][0], f["pos"][1], major, len(f["bearings"]), minor, orient])
 
     def set_sources(self, fixes):
@@ -623,8 +692,11 @@ class Gcs:
         old = self.fixes
         self.fixes = new
         prev = {b["id"]: b["source"] for b in self.bearings} if ESTIMATOR_V2 else None
-        assigned = assign_bearings(self.bearings, new, prev=prev)
-        amb = ambiguous_bearings(self.bearings, new) if ESTIMATOR_V2 else set()
+        # v3: each source's previous ellipse, centred on its new position, widens its gate
+        ells = ({sid: old[sid]["ellipse_m_deg"] for sid in new if sid in old and "ellipse_m_deg" in old[sid]}
+                if ESTIMATOR_V3 else None)
+        assigned = assign_bearings(self.bearings, new, prev=prev, ells=ells)
+        amb = ambiguous_bearings(self.bearings, new, ells=ells) if ESTIMATOR_V2 else set()
         by_id = {b["id"]: b for b in self.bearings}
         for sid, f in new.items():
             # the label counts the bearings drawn in this source's colour, not the localisation's own
@@ -638,8 +710,12 @@ class Gcs:
                 # the published position comes from the fit to all readings; where it disagrees with its own
                 # bearings' crossing by more than 2 sigma, the ellipse is widened to cover that crossing
                 cross = bearing_crossing(f["pos"], use)
-                m = ellipse_distance(f["pos"], ell, cross) if cross is not None else 0.0
-                if m > 2.0:
+                m = min(ellipse_distance(f["pos"], ell, cross), WIDEN_MAX) if cross is not None else 0.0
+                if m > 2.0 and ESTIMATOR_V3:
+                    # v3: only along the offset, enough to bring the crossing inside 2 sigma
+                    d = np.array(ned(f["pos"], cross))
+                    ell = cov_ellipse(ellipse_cov(ell) + np.outer(d, d) / 4.0)
+                elif m > 2.0:
                     ell = (ell[0] * m / 2.0, ell[1] * m / 2.0, ell[2])
             if ell is not None:
                 f["ellipse_m_deg"] = ell
@@ -775,7 +851,8 @@ def main():
                      mavutil.mavlink.MAV_SEVERITY_WARNING)
             return
         # same fit and calibrated sigma for both scenarios; one source: keep the strongest peak
-        peaks = [(b, a, math.hypot(PEAK_SIGMA_SCALE * sg, PEAK_SIGMA_FLOOR_DEG)) for b, a, sg in fit_peaks(samples)]
+        peaks = [(b, a, math.hypot(PEAK_SIGMA_SCALE * sg, PEAK_SIGMA_FLOOR_DEG) * level_factor(a))
+                 for b, a, sg in fit_peaks(samples)]
         if not peaks:
             # enough readings over the threshold but none stands out as a peak (e.g. the source on the beam's edge)
             gcs.text(f"RF: observation {i}: no peak in {nvalid} valid readings", mavutil.mavlink.MAV_SEVERITY_WARNING)
@@ -857,7 +934,12 @@ def main():
                     rerun = False
                     job = submit()
                 continue
-            t_done = publish(fixes, details, final)
+            try:
+                t_done = publish(fixes, details, final)
+            except Exception as ex:               # never lose the companion (and with it RF_dBm) to one bad update
+                gcs.text(f"RF: publish failed ({type(ex).__name__}: {ex}), keeping the last fixes",
+                         mavutil.mavlink.MAV_SEVERITY_WARNING)
+                t_done = time.time() if final else None
             if final:
                 result_t = t_done
             elif rerun:

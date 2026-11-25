@@ -5,7 +5,8 @@ previous 2-sigma ellipse, and how often the true source lies inside the 2-sigma 
 
 usage: python compare/rfsearch/replay_progressive.py [--v2] RESULTS_DIR... > out.json
 RESULTS_DIR is a run's believer-* directory (rf_result.json, rf_samples.csv, events.txt). --v2 switches on the
-estimator changes behind rf_companion.ESTIMATOR_V2.
+estimator changes behind rf_companion.ESTIMATOR_V2, --v3 those behind ESTIMATOR_V3 as well. Bearing sigmas are the
+ones stored in the run (so the signal-level factor is in them only for runs flown with it).
 """
 import csv
 import json
@@ -60,8 +61,10 @@ def mahal(f, p):
 
 
 def replay(args):
-    d, v2 = args
+    d, v2, v3 = args
+    sys.stdout = sys.stderr                       # the companion's text() prints; keep stdout for the JSON
     rc.ESTIMATOR_V2 = v2
+    rc.ESTIMATOR_V3 = v3
     res, st, dn, rec, legs = load(d)
     truth = res["truth"]
     gcs = rc.Gcs(Null())
@@ -103,7 +106,7 @@ def replay(args):
     final = steps[-1]["src"]
     flat = [o for s in steps for o in s["src"].values() if o]
     late = [o for s in steps[-5:] for o in s["src"].values() if o]
-    return dict(run=str(d), v2=v2, final=[round(o["err"]) if o else None for o in final.values()],
+    return dict(run=str(d), v2=v2, v3=v3, final=[round(o["err"]) if o else None for o in final.values()],
                 updates=len(flat), grew=sum(o.get("grew", False) for o in flat),
                 jumps=sum(o.get("jump", False) for o in flat), inside=sum(o["inside"] for o in flat),
                 late_err=[round(o["err"]) for o in late], late_inside=sum(o["inside"] for o in late),
@@ -113,9 +116,10 @@ def replay(args):
 
 
 if __name__ == "__main__":
-    v2 = "--v2" in sys.argv
+    v3 = "--v3" in sys.argv
+    v2 = "--v2" in sys.argv or v3
     dirs = [a for a in sys.argv[1:] if not a.startswith("--")]
     with ProcessPoolExecutor(min(len(dirs), 15)) as ex:
-        out = list(ex.map(replay, [(d, v2) for d in dirs]))
+        out = list(ex.map(replay, [(d, v2, v3) for d in dirs]))
     json.dump(out, sys.stdout, indent=1)
     print()
