@@ -54,4 +54,8 @@ file 'screenshots/rfsearch_4src_flight/frame27.png'
 duration 1
 file 'screenshots/rfsearch_4src_flight/frame28.png'
 duration 3
-file 'screenshots/rfsearch_4src_flight/frame28.png'
+file 'screenshots/rfsearch_4src_flight/frame29.png'
+duration 3
+file 'screenshots/rfsearch_4src_flight/frame30.png'
+duration 3
+file 'screenshots/rfsearch_4src_flight/frame30.png'
