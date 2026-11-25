@@ -55,7 +55,14 @@ SCENARIOS = {"single": [(*SOURCE, 47.0)],
              "multi": [(49.7584654, 23.916365, 47.0), (49.7756929, 23.9801122, 47.0), (49.7392535, 23.9857272, 47.0)],
              # a second set inside tsuniv_rf_ellipse.plan, (along, across) (15.5, -3.0), (19.5, 3.5), (18.0, -6.0) km:
              # 3.9-9.6 km apart, 3-6.7 km inside the route abeam, none within 2.4 km of a "multi" source
-             "multi_b": [(49.8060152, 23.9078339, 47.0), (49.7390325, 23.9310572, 47.0), (49.8242052, 23.9544023, 47.0)]}
+             "multi_b": [(49.8060152, 23.9078339, 47.0), (49.7390325, 23.9310572, 47.0), (49.8242052, 23.9544023, 47.0)],
+             # 5 sources 20-27.5 km south-west (bearing 225) for tsuniv_rf_ellipse_sw.plan, at least 3.6 km apart
+             "sw5": [(49.7146026, 23.4681194, 47.0), (49.6573702, 23.4976917, 47.0), (49.6700885, 23.4286896, 47.0),
+                     (49.6382927, 23.4385470, 47.0), (49.6987047, 23.4040460, 47.0)],
+             # sw5 without its middle source (25.5 km out, 1 km left), which overlapped a neighbour from everywhere
+             # on the route: 4 sources, at least 4.7 km apart
+             "sw4": [(49.7146026, 23.4681194, 47.0), (49.6573702, 23.4976917, 47.0),
+                     (49.6382927, 23.4385470, 47.0), (49.6987047, 23.4040460, 47.0)]}
 # per-peak bearing sigma = hypot(PEAK_SIGMA_SCALE * fit sigma, PEAK_SIGMA_FLOOR_DEG): calibrated on 120
 # offline-study peaks against their true bearings (66 % within 1 sigma, 98 % within 2; median ~2 deg).
 # The raw fit sigma tracks the error (correlation 0.82) and widens for weak peaks, but assumes
@@ -76,6 +83,9 @@ ESTIMATOR_V2 = True
 STICKY_GATE = 5.0                        # sigma; a new assignment needs the usual 3
 PRIOR_MATCH_M, PRIOR_SCALE, PRIOR_MIN_M = 2000.0, 2.0, 150.0   # prior sigma = max(scale x previous, min)
 MOVED_WARN_MIN_BRG = 4                   # "moved outside its ellipse" only with at least this many bearings
+# largest subset of candidates select_sources tries: C(10, <=4) = 385 fits. 5 was tried (2026-11-25) and let a false
+# fifth source in when four overlapping real ones were there
+MAX_SOURCES = 4
 EIRP_DBM, FREQ_HZ = 47.0, 1.8e9          # 50 W noise source; only sets the power level
 PL_EXP, D0_M = 3.0, 100.0                # log-distance path loss beyond D0 (free space below)
 G0_DBI, BEAM_DEG, BACK_DB = 15.0, 30.0, 20.0    # helix; was a 45 deg, 8 dBi patch until 2026-11-24
@@ -354,7 +364,7 @@ def locate(bearings, centre, half_size=9000.0, step=50.0, min_obs=3, merge_m=100
         cov = np.linalg.inv(hess)
         out.append(dict(pos=latlon(centre, x[0], x[1]), sigma_m=float(math.sqrt(max(np.linalg.eigvalsh(cov)))),
                         n=len(rows), obs=sorted(used), score=float(sc), ne=(float(x[0]), float(x[1]))))
-    # select_sources tries every subset of up to 4: C(10, <=4) = 385 fits, C(52, <=4) would be ~290 000
+    # select_sources tries every subset of up to MAX_SOURCES: C(10, <=4) = 385 fits, C(52, <=4) would be ~290 000
     out = sorted(out, key=lambda c: -c["score"])[:max_cands]
     for o in out:
         del o["ne"]
@@ -395,7 +405,7 @@ def _fit_eirp(p, terms, eirp=None, only=None):
     return _sse(p, terms, eirp), eirp
 
 
-def select_sources(samples, cands, max_k=4, weak_db=8.0, priors=()):
+def select_sources(samples, cands, max_k=MAX_SOURCES, weak_db=8.0, priors=()):
     """Which candidates are sources, and where exactly. Every subset of up to max_k candidates is
     fitted to all recorded readings (each source's power solved for) and the lowest BIC wins, so a
     ghost crossing that predicts readings nobody saw costs more than it explains. The chosen sources'

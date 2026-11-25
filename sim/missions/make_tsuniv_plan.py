@@ -206,9 +206,36 @@ RF_ELLIPSE = [
     *LANDING,
 ]
 
+# The same ellipse in another direction (2026-11-25): area of interest RFW_D out on bearing RFW_BRG (south-west,
+# away from the first area), standoff RFW_STANDOFF beyond it: ~74 km of ellipse through RFW_POINTS waypoints
+# ~5.4 km apart, ~87 km and ~1 h 15 min at 19 m/s with the climb-out and the return. The standoff was 8 km
+# (~106 km) at first, but with the route 10-18 km from the cluster on its near half, four sources 4.7-8.7 km apart
+# came out 100-970 m off; 4 km brings the route in. The far vertex is 28 km out, inside the 35 km fence.
+# Hidden sources for it: rf_companion.py scenario "sw4".
+RFW_BRG, RFW_D, RFW_STANDOFF, RFW_POINTS = 225.0, 24000.0, 4000.0, 14
+RFW_A, RFW_C = (RFW_D + RFW_STANDOFF) / 2, (RFW_D - RFW_STANDOFF) / 2
+RFW_B = math.sqrt(RFW_A ** 2 - RFW_C ** 2)
+
+
+def ellipse_sw(k, n=RFW_POINTS):
+    """Waypoint k of the south-west ellipse as (lat, lon): clockwise seen from above, k = 0 at home."""
+    t = math.pi - 2 * math.pi * k / n
+    return offset(RFW_A * (1 + math.cos(t)), -RFW_B * math.sin(t), hdg=RFW_BRG)
+
+
+RF_ELLIPSE_SW = [
+    ("nav", TAKEOFF, offset(0), 120, dict(p1=12)),
+    ("nav", WAYPOINT, offset(2000), 400, {}),                       # climb-out on the runway heading
+    ("nav", WAYPOINT, ellipse_sw(1), 700, {}),                      # onto the ellipse, still climbing
+    *[("nav", WAYPOINT, ellipse_sw(k), RFM_ALT, {}) for k in range(2, RFW_POINTS - 1)],
+    ("nav", WAYPOINT, ellipse_sw(RFW_POINTS - 1), 700, {}),
+    ("nav", WAYPOINT, offset(6000), 400, {}),                       # past home to the landing side, descending
+    *LANDING,
+]
+
 MISSIONS = {"tsuniv_search.plan": (SHORT, 9000.0), "tsuniv_search_long.plan": (LONG, 35000.0),
             "tsuniv_rf_search.plan": (RF, 15000.0), "tsuniv_rf_multi.plan": (RF_MULTI, 35000.0),
-            "tsuniv_rf_ellipse.plan": (RF_ELLIPSE, 35000.0)}
+            "tsuniv_rf_ellipse.plan": (RF_ELLIPSE, 35000.0), "tsuniv_rf_ellipse_sw.plan": (RF_ELLIPSE_SW, 35000.0)}
 # tsuniv_rf_sweep.plan started as RF_SWEEP but has since been reworked in QGC (2026-11-24): QGC's file is
 # the source now and is not rewritten here
 

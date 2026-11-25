@@ -1,0 +1,181 @@
+{
+ "summary": {
+  "flights": 10,
+  "sources": 26,
+  "found": 26,
+  "extra": 0,
+  "median_m": 54,
+  "p90_m": 100,
+  "max_m": 142,
+  "within_100": 24,
+  "errors": 26
+ },
+ "runs": [
+  {
+   "run": "compare/results/mission-20261125-131852-i1/believer-5kg-avl-at",
+   "plan": "ellipse",
+   "scenario": "multi_b",
+   "seed": 11,
+   "sweeps": 27,
+   "flight_s": 3733.9,
+   "fixes": 3,
+   "sources": 3,
+   "errors_m": [
+    100,
+    54,
+    29
+   ],
+   "missed": 0,
+   "extra": 0
+  },
+  {
+   "run": "compare/results/mission-20261125-131907-i6/believer-5kg-avl-at",
+   "plan": "ellipse",
+   "scenario": "multi_b",
+   "seed": 44,
+   "sweeps": 27,
+   "flight_s": 3734.0,
+   "fixes": 3,
+   "sources": 3,
+   "errors_m": [
+    66,
+    142,
+    29
+   ],
+   "missed": 0,
+   "extra": 0
+  },
+  {
+   "run": "compare/results/mission-20261125-131855-i2/believer-5kg-avl-at",
+   "plan": "ellipse",
+   "scenario": "multi",
+   "seed": 11,
+   "sweeps": 18,
+   "flight_s": 3508.0,
+   "fixes": 3,
+   "sources": 3,
+   "errors_m": [
+    45,
+    68,
+    15
+   ],
+   "missed": 0,
+   "extra": 0
+  },
+  {
+   "run": "compare/results/mission-20261125-131910-i7/believer-5kg-avl-at",
+   "plan": "ellipse",
+   "scenario": "multi",
+   "seed": 44,
+   "sweeps": 18,
+   "flight_s": 3531.9,
+   "fixes": 3,
+   "sources": 3,
+   "errors_m": [
+    98,
+    70,
+    8
+   ],
+   "missed": 0,
+   "extra": 0
+  },
+  {
+   "run": "compare/results/mission-20261125-131858-i3/believer-5kg-avl-at",
+   "plan": "ellipse",
+   "scenario": "single",
+   "seed": 11,
+   "sweeps": 22,
+   "flight_s": 3622.0,
+   "fixes": 1,
+   "sources": 1,
+   "errors_m": [
+    55
+   ],
+   "missed": 0,
+   "extra": 0
+  },
+  {
+   "run": "compare/results/mission-20261125-131913-i8/believer-5kg-avl-at",
+   "plan": "ellipse",
+   "scenario": "single",
+   "seed": 44,
+   "sweeps": 23,
+   "flight_s": 3645.0,
+   "fixes": 1,
+   "sources": 1,
+   "errors_m": [
+    45
+   ],
+   "missed": 0,
+   "extra": 0
+  },
+  {
+   "run": "compare/results/mission-20261125-131901-i4/believer-5kg-avl-at",
+   "plan": "user",
+   "scenario": "multi_b",
+   "seed": 11,
+   "sweeps": 28,
+   "flight_s": 3977.0,
+   "fixes": 3,
+   "sources": 3,
+   "errors_m": [
+    33,
+    53,
+    13
+   ],
+   "missed": 0,
+   "extra": 0
+  },
+  {
+   "run": "compare/results/mission-20261125-131916-i9/believer-5kg-avl-at",
+   "plan": "user",
+   "scenario": "multi_b",
+   "seed": 44,
+   "sweeps": 28,
+   "flight_s": 3976.0,
+   "fixes": 3,
+   "sources": 3,
+   "errors_m": [
+    20,
+    32,
+    55
+   ],
+   "missed": 0,
+   "extra": 0
+  },
+  {
+   "run": "compare/results/mission-20261125-131904-i5/believer-5kg-avl-at",
+   "plan": "user",
+   "scenario": "multi",
+   "seed": 11,
+   "sweeps": 27,
+   "flight_s": 3954.0,
+   "fixes": 3,
+   "sources": 3,
+   "errors_m": [
+    61,
+    132,
+    66
+   ],
+   "missed": 0,
+   "extra": 0
+  },
+  {
+   "run": "compare/results/mission-20261125-131919-i10/believer-5kg-avl-at",
+   "plan": "user",
+   "scenario": "multi",
+   "seed": 44,
+   "sweeps": 27,
+   "flight_s": 3954.0,
+   "fixes": 3,
+   "sources": 3,
+   "errors_m": [
+    18,
+    37,
+    85
+   ],
+   "missed": 0,
+   "extra": 0
+  }
+ ]
+}
